@@ -6,6 +6,7 @@
 
 # Runtime
 numpy==2.5.3
+PyYAML==6.0.3
 tzdata==2026.4  # IANA database for zoneinfo on Windows (no system tz database there)
 
 # Test tooling

@@ -283,7 +283,7 @@ def _window_stats(
 
 
 def metric_window_features(
-    timeline: Aligned_Timeline, windows: Sequence[Window_Bounds]
+    timeline: Aligned_Timeline, windows: Sequence[Window_Bounds], smoothing_windows=None
 ) -> tuple[dict[Metric, Metric_Window_Features], ...]:
     """Per-Continuous_Metric features of every window (Req 12.2-12.5).
 
@@ -298,7 +298,7 @@ def metric_window_features(
     result: list[dict[Metric, Metric_Window_Features]] = [{} for _ in windows]
     for metric in FEATURE_METRICS:
         y_all = _metric_arrays(timeline, metric)
-        half_us = (SMOOTHING_WINDOW[metric] // _ONE_US) / 2
+        half_us = ((smoothing_windows or SMOOTHING_WINDOW)[metric] // _ONE_US) / 2
         for k, w in enumerate(windows):
             # Smoothing interval: closed, centred on the midpoint, truncated to the session.
             s_lo = max(0.0, w.midpoint_us - half_us)
@@ -553,7 +553,7 @@ def smooth_coarse_states(stages: Sequence[Sleep_Stage]) -> list[Coarse_State]:
 
 
 def extract(
-    timeline: Aligned_Timeline, session: SleepSession, target_duration: int
+    timeline: Aligned_Timeline, session: SleepSession, target_duration: int, *, smoothing_windows=None
 ) -> tuple[Feature_Series, list[Coarse_State], Processing_Report]:
     """Extract statistics, stage coverage, movement, and smoothed coarse states."""
     compression = night_compression(session, target_duration)
@@ -561,8 +561,13 @@ def extract(
     coverage = window_stage_coverage(session, windows)
     report = Processing_Report()
     series = assemble_feature_series(
-        windows, metric_window_features(timeline, windows),
+        windows, metric_window_features(timeline, windows, smoothing_windows),
         [c.stage_fractions for c in coverage], [c.dominant_stage for c in coverage],
         window_movement_intensity(timeline, windows, coverage, report), compression.ratio,
     )
+    from dataclasses import replace
+    from datetime import timezone
+    brief = tuple((s.start_time, s.end_time) for s in session.stages if s.stage is Sleep_Stage.awake and
+                  (s.end_time.astimezone(timezone.utc) - s.start_time.astimezone(timezone.utc)).total_seconds() < compression.ratio)
+    series = replace(series, session_hrv=session.session_hrv, brief_awakenings=brief)
     return series, smooth_coarse_states(series.dominant_stages), report

@@ -194,8 +194,12 @@ class Feature_Series:
 
     windows: tuple[Feature_Window, ...]
     compression_ratio: float
+    session_hrv: float | None = None
+    brief_awakenings: tuple[tuple[datetime, datetime], ...] = ()
+    unavailable_metrics: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        _check_optional_number(self.session_hrv, "session_hrv")
         windows = tuple(self.windows)
         if not all(isinstance(w, Feature_Window) for w in windows):
             raise TypeError("windows must contain only Feature_Window values")

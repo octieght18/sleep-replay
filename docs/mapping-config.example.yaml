@@ -1,0 +1,30 @@
+heart_rate:
+  target: "pulse_rate"
+  sensitivity: 0.5
+  smoothing_minutes: 5
+  hysteresis: 1.0
+hrv:
+  target: "modulation"
+  sensitivity: 0.3
+  smoothing_minutes: 15
+  hysteresis: 2.0
+movement:
+  target: "transient_density"
+  sensitivity: 0.8
+temperature:
+  target: "brightness"
+  sensitivity: 0.3
+  smoothing_minutes: 15
+  hysteresis: 0.1
+humidity:
+  target: "texture_density"
+  sensitivity: 0.3
+  smoothing_minutes: 15
+  hysteresis: 0.5
+pressure:
+  target: "modulation"
+  sensitivity: 0.2
+  smoothing_minutes: 15
+  hysteresis: 0.1
+target_duration: 180
+random_seed: 20240301

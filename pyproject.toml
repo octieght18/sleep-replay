@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sleep-replay"
-version = "0.1.0"
+version = "0.2.0"
 description = "Sleep Replay: turns a night of sleep and bedroom telemetry into a compressed audio replay."
 requires-python = ">=3.11"
 dependencies = [
     "numpy==2.5.3",
     "tzdata==2026.4",
+    "PyYAML==6.0.3",
 ]
 
 [project.optional-dependencies]
@@ -17,6 +18,9 @@ test = [
     "pytest==9.1.1",
     "hypothesis==6.168.3",
 ]
+
+[project.scripts]
+sleep-replay = "backend.api.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["backend*", "tools*"]
@@ -32,3 +36,4 @@ pythonpath = ["."]
 # (Requirement 18.7), so pytest's .pytest_cache is disabled.
 addopts = "-ra --strict-markers --strict-config -p no:cacheprovider"
 xfail_strict = true
+markers = ["reference_machine: timed audio generation checks; deselect with -m 'not reference_machine'"]

@@ -67,12 +67,16 @@ class Pipeline:
     All paths written by this service are inside its Data_Directory.
     """
 
-    def __init__(self, data_dir: str | Path | None = None, *, registry: AdapterRegistry | None = None):
+    def __init__(self, data_dir: str | Path | None = None, *, registry: AdapterRegistry | None = None, display_timezone: str | None = None):
         env = dict(os.environ)
         if data_dir is not None:
             env["SLEEP_REPLAY_DATA_DIR"] = str(data_dir)
+        if display_timezone is not None:
+            from backend.domain.timezones import validate_iana
+            validate_iana(display_timezone)
+            env["SLEEP_REPLAY_DISPLAY_TIMEZONE"] = display_timezone
         self.data_dir = prepare_data_dir(env)
-        self.display_timezone = resolve_display_timezone()
+        self.display_timezone = resolve_display_timezone(env)
         self.display_tz = self.display_timezone.zone
         self.registry = registry if registry is not None else AdapterRegistry()
         for adapter in (FitbitImporter(), SensorPushImporter()):
@@ -210,6 +214,12 @@ class Pipeline:
     def import_files(self, source_id: str, files: Source, tz_overrides: Mapping[str, str] | None = None):
         return self._import_batch([(source_id, files, tz_overrides)])
 
+    def import_sources(self, requests):
+        """Atomically import (source_id, files, timezone_overrides) groups."""
+        if not requests:
+            raise User_Error(SOURCE_LOAD_FAILED, "No input files were provided.", "Choose at least one local export file.")
+        return self._import_batch(requests)
+
     def use_sample_data(self):
         directory = Path(__file__).resolve().parents[2] / "sample_data"
         fitbit = sorted(p for p in directory.iterdir() if p.name != "sensorpush.csv")
@@ -234,7 +244,7 @@ class Pipeline:
     def define_manual_range(self, start, end):
         return self._set_selection(define_manual_session(start, end, self.display_tz))
 
-    def process(self, target_duration: int | None = None) -> ProcessResult:
+    def process(self, target_duration: int | None = None, *, mapping_config=None) -> ProcessResult:
         candidates, selection = self._discover(Import_Report())
         if selection is None:
             raise no_sleep_session_error()
@@ -247,15 +257,39 @@ class Pipeline:
                 INSUFFICIENT_DATA, "The selected session has no sleep stages, heart rate, or room measurements.",
                 "Import data for this night or choose another sleep session.",
             )
-        target = select_target_duration(target_duration)
+        target = select_target_duration(target_duration, mapping_config)
         compression = night_compression(session, target)
         nearby, _ = self._load_points()
         zones = [r.import_report.applied_source_timezones.get(FITBIT_HEART_RATE)
                  for r in self.metadata_store.list_imports()]
         timeline, alignment_report = align(session, nearby, heart_rate_source_timezone=next(
             (z for z in reversed(zones) if z), "UTC"))
-        features, states, feature_report = extract(timeline, session, target)
+        smoothing_windows = None
+        if mapping_config is not None:
+            from datetime import timedelta
+            from backend.domain.mapping import FEATURE_METRICS, validate_mapping
+            validate_mapping(mapping_config)
+            smoothing_windows = {metric: timedelta(minutes=mapping_config.metrics[key].smoothing_minutes)
+                                 for key, metric in FEATURE_METRICS.items()}
+        features, states, feature_report = extract(timeline, session, target, smoothing_windows=smoothing_windows)
         events = detect(session, timeline, features, states, target, self.display_tz)
         return ProcessResult(session, timeline, features, tuple(states), tuple(events),
                              merge_processing_reports([alignment_report, feature_report]),
                              compression, input_fingerprint(session))
+
+    def generate(self, config=None, *, seed=None, output=None):
+        """Process the selected session and atomically store its WAV and manifest."""
+        from backend.domain.mapping import DEFAULT_MAPPING, validate_seed
+        from backend.sonification.generation import generate_replay
+        config = DEFAULT_MAPPING if config is None else config
+        validate_seed(config.random_seed if seed is None else seed)
+        try:
+            result = self.process(mapping_config=config)
+        except User_Error as error:
+            if error.code == INSUFFICIENT_DATA:
+                raise User_Error("NO_USABLE_DATA", "The session contains no usable data.",
+                                 "Import Fitbit sleep or heart-rate files, or a SensorPush CSV for this night.") from None
+            raise
+        return generate_replay(result.session, result.timeline, result.features, result.coarse_states, result.events,
+            data_dir=self.data_dir, metadata_store=self.metadata_store, config=config, seed=seed, output=output,
+            display_timezone=self.display_tz.key, processing_report=result.report, input_fingerprint=result.input_fingerprint)

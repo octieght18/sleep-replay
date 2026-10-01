@@ -41,6 +41,8 @@ __all__ = [
     "DATA_DIR_UNWRITABLE",
     "INSUFFICIENT_DATA",
     "SOURCE_LOAD_FAILED",
+    "INVALID_MAPPING_CONFIG", "INVALID_RANDOM_SEED", "NO_USABLE_DATA",
+    "RENDERING_FAILED", "REPLAY_WRITE_FAILED", "GENERATION_IN_PROGRESS",
     "NO_ACTION_REQUIRED",
     "User_Error",
     "Warning_Item",
@@ -60,6 +62,12 @@ class ErrorCode(StrEnum):
     """Stable error codes. Each value is identical for every occurrence of the
     same condition and is listed in the Documentation troubleshooting section."""
 
+    INVALID_MAPPING_CONFIG = "INVALID_MAPPING_CONFIG"
+    INVALID_RANDOM_SEED = "INVALID_RANDOM_SEED"
+    NO_USABLE_DATA = "NO_USABLE_DATA"
+    RENDERING_FAILED = "RENDERING_FAILED"
+    REPLAY_WRITE_FAILED = "REPLAY_WRITE_FAILED"
+    GENERATION_IN_PROGRESS = "GENERATION_IN_PROGRESS"
     NO_FITBIT_FILES = "NO_FITBIT_FILES"
     MULTIPLE_ARCHIVES = "MULTIPLE_ARCHIVES"
     ARCHIVE_UNREADABLE = "ARCHIVE_UNREADABLE"
@@ -79,6 +87,12 @@ class ErrorCode(StrEnum):
 
 # The fixed table: code -> condition summary (for the troubleshooting docs).
 ERROR_CODE_TABLE: Mapping[ErrorCode, str] = {
+    ErrorCode.INVALID_MAPPING_CONFIG: "The mapping configuration contains invalid keys or values.",
+    ErrorCode.INVALID_RANDOM_SEED: "The random seed is not an integer from 0 to 4294967295.",
+    ErrorCode.NO_USABLE_DATA: "The selected session has no sleep stages, heart rate, or environmental data.",
+    ErrorCode.RENDERING_FAILED: "Audio could not be rendered within the output limits.",
+    ErrorCode.REPLAY_WRITE_FAILED: "The replay artifacts or metadata could not be stored.",
+    ErrorCode.GENERATION_IN_PROGRESS: "A replay generation is already in progress.",
     ErrorCode.NO_FITBIT_FILES: "The import contains no file matching a supported Fitbit file name pattern.",
     ErrorCode.MULTIPLE_ARCHIVES: "More than one archive, or an archive together with individual files, was provided.",
     ErrorCode.ARCHIVE_UNREADABLE: "The archive could not be opened or read.",
@@ -114,6 +128,12 @@ PERSISTED_DATA_UNREADABLE: str = ErrorCode.PERSISTED_DATA_UNREADABLE.value
 DATA_DIR_UNWRITABLE: str = ErrorCode.DATA_DIR_UNWRITABLE.value
 INSUFFICIENT_DATA: str = ErrorCode.INSUFFICIENT_DATA.value
 SOURCE_LOAD_FAILED: str = ErrorCode.SOURCE_LOAD_FAILED.value
+INVALID_MAPPING_CONFIG: str = ErrorCode.INVALID_MAPPING_CONFIG.value
+INVALID_RANDOM_SEED: str = ErrorCode.INVALID_RANDOM_SEED.value
+NO_USABLE_DATA: str = ErrorCode.NO_USABLE_DATA.value
+RENDERING_FAILED: str = ErrorCode.RENDERING_FAILED.value
+REPLAY_WRITE_FAILED: str = ErrorCode.REPLAY_WRITE_FAILED.value
+GENERATION_IN_PROGRESS: str = ErrorCode.GENERATION_IN_PROGRESS.value
 
 # Recommended action text for warnings that need no user action (Req 16.4).
 NO_ACTION_REQUIRED = "No action is required."

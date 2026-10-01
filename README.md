@@ -65,13 +65,15 @@ backend/
   processing/   # session detection, alignment, resampling, compression,
                 # feature extraction, event detection
   persistence/  # data directory, metadata + telemetry stores, safe logging
-  sonification/ # mapping config → sound parameters (planned)
-  audio/        # WAV rendering (planned)
-  api/          # backend API for the browser UI (planned)
+  sonification/ # mapping configuration, render plans, manifests, generation
+  audio/        # deterministic stereo PCM WAV synthesis
+  api/          # pipeline service and CLI; HTTP API remains planned
 tests/          # pytest + Hypothesis test suite
 plan/specs/     # full requirements/design/tasks specs (see below)
 sample_data/    # synthetic sample dataset
 tools/          # deterministic sample-data generator
+examples/       # playable sample WAV and its replay manifest
+docs/           # example mapping configuration
 ```
 
 ## Setup
@@ -94,12 +96,64 @@ python -m pytest
 
 The suite uses pytest with property-based tests via Hypothesis and covers the
 domain model, importers, timezone handling, alignment, compression, feature
-extraction, event detection, and persistence.
+extraction, event detection, persistence, configuration, audio synthesis,
+replay manifests, determinism, graceful degradation, and the CLI. All tests
+write to temporary directories and run offline. Timed generation checks are
+marked `reference_machine`; on slower hardware, deselect them with
+`python -m pytest -m "not reference_machine"`.
+
+## Generate an audio replay
+
+Listen to [the three-minute example WAV](examples/example_replay.wav). Its
+[manifest](examples/example_replay.json) records the session, sleep states,
+events, windowed environmental values, availability, and effective settings.
+It contains no raw telemetry or generation timestamp.
+
+From the repository root, this command regenerates both example files
+byte-for-byte. The target duration is **180 seconds**, random seed **20240301**,
+and display timezone **America/New_York**. The command works in PowerShell and
+Bash; explicit file names keep it independent of shell wildcard expansion.
+
+```powershell
+python -m backend.api.cli generate "sample_data/sleep-2024-03-01.json" "sample_data/heart_rate-2024-03-01.json" "sample_data/steps-2024-03-01.json" "sample_data/Heart Rate Variability Details - 2024-03-01.csv" "sample_data/sensorpush.csv" --target-duration 180 --seed 20240301 --display-timezone America/New_York --fitbit-heart-rate-timezone America/New_York --fitbit-steps-timezone America/New_York --output examples/example_replay.wav
+```
+
+Use your own Fitbit JSON/CSV files or one Fitbit ZIP, plus any SensorPush CSVs,
+as positional arguments. Durations are 30, 120, 180, 300, or 600 seconds. For real
+Fitbit intraday exports, heart rate and steps default to UTC; the overrides above
+are specific to the synthetic dataset. Other file types default to the display
+timezone. An explicit offset in an input timestamp takes precedence.
+
+`--config docs/mapping-config.example.yaml` loads a YAML or JSON mapping;
+`--target-duration` and `--seed` override that file. Omitted settings use defaults,
+and the CLI ignores previously stored settings and imports. The six metric keys
+map to shared sound parameters with sensitivity, smoothing, and hysteresis.
+The [example configuration](docs/mapping-config.example.yaml) includes all defaults.
+An invalid configuration applies no values and produces no replay.
+
+Use `--session-date YYYY-MM-DD` to select by the session's end date. For room data
+without sleep logs, provide `--manual-start 2024-03-01T22:00:00` and
+`--manual-end 2024-03-02T06:00:00`; offset-free times use the display timezone.
+Manual times cannot be combined with a session date. Override other source
+timezones with `--source-timezone FILE_TYPE=IANA_ZONE`; `generate --help` lists
+individual timezone options as well.
+
+Successful generation prints absolute WAV/JSON paths, session times, compression
+ratio, event count, and warnings. Each replay is stored under the Data_Directory's
+`replays/` folder with a SQLite record before completion is reported. `--output`
+also exports the WAV and a JSON file with the same stem, replacing existing
+destination files together; a failed generation preserves those files and
+earlier replays. Generation time belongs only to the SQLite record.
+
+```powershell
+python -m backend.api.cli sample-data --out synthetic-night
+python -m backend.api.cli generate --help
+```
 
 ## Try the data pipeline
 
-The data pipeline is available as a local Python service. HTTP, audio rendering,
-and the browser UI belong to the other specs and remain planned.
+The pipeline and audio generation are available as a local Python service.
+The HTTP API and browser UI remain planned.
 
 ```python
 from backend.api.pipeline import Pipeline
@@ -108,6 +162,8 @@ with Pipeline() as pipeline:
     report, candidates = pipeline.use_sample_data()
     result = pipeline.process(180)
     print(len(candidates), len(result.features), len(result.events))  # 1, 360, 12
+    replay = pipeline.generate()
+    print(replay.wav_path, replay.manifest_path)
 ```
 
 `Pipeline.import_files(source_id, files, tz_overrides)` imports real local exports.
@@ -124,7 +180,9 @@ stored. Otherwise the default is `%LOCALAPPDATA%\SleepReplay` on Windows,
 `~/.local/share/sleep-replay`). Set `SLEEP_REPLAY_DISPLAY_TIMEZONE` to an IANA
 name such as `America/New_York`; the default is the host timezone, with UTC
 and a warning when it cannot be determined. Startup checks storage before
-reading input. Import and processing require no credentials or network access.
+reading input. Import, processing, and audio generation require no credentials
+or network access. `Pipeline(display_timezone="America/New_York")` sets an
+explicit timezone without changing the process environment.
 
 ## Synthetic sample data
 
@@ -152,7 +210,7 @@ This repository is being built from three specs (in `plan/specs/`):
 | Spec | Scope | Status |
 |---|---|---|
 | `sleep-replay-data-pipeline` | Domain model, import, session discovery, alignment, features, events, persistence | Implemented |
-| `sleep-replay-sonification` | Mapping config, soundscape presets, audio rendering, replay manifest, CLI | Planned |
+| `sleep-replay-sonification` | Mapping config, soundscape presets, audio rendering, replay manifest, CLI | Implemented |
 | `sleep-replay-app` | Backend API, browser UI, Docker setup, end-to-end flow | Planned |
 
 Each spec contains `requirements.md`, `design.md`, and `tasks.md` with the full

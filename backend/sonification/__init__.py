@@ -1,1 +1,1 @@
-"""Sonification package (placeholder; implemented in the sleep-replay-sonification spec)."""
+"""Deterministic feature-to-sound mapping, replay metadata, and generation."""
