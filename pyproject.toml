@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sleep-replay"
+version = "0.1.0"
+description = "Sleep Replay: turns a night of sleep and bedroom telemetry into a compressed audio replay."
+requires-python = ">=3.11"
+dependencies = [
+    "numpy==2.5.3",
+    "tzdata==2026.4",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest==9.1.1",
+    "hypothesis==6.168.3",
+]
+
+[tool.setuptools.packages.find]
+include = ["backend*", "tools*"]
+
+[tool.pytest.ini_options]
+# `python -m pytest` from the repository root runs the whole suite and exits
+# non-zero when any test fails.
+minversion = "9.0"
+testpaths = ["tests"]
+# Make `backend` and `tools` importable without installing the project.
+pythonpath = ["."]
+# -p no:cacheprovider: the suite must not write files into the repository
+# (Requirement 18.7), so pytest's .pytest_cache is disabled.
+addopts = "-ra --strict-markers --strict-config -p no:cacheprovider"
+xfail_strict = true

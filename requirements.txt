@@ -1,0 +1,13 @@
+# Exact pinned versions for the Sleep Replay Backend and its Test_Suite.
+# Python >= 3.11 is required.
+#
+# Install:  python -m pip install -r requirements.txt
+# Test:     python -m pytest
+
+# Runtime
+numpy==2.5.3
+tzdata==2026.4  # IANA database for zoneinfo on Windows (no system tz database there)
+
+# Test tooling
+pytest==9.1.1
+hypothesis==6.168.3
