@@ -37,6 +37,7 @@ from backend.domain.errors import (
 )
 from backend.domain.session import SleepSession, StageDataAvailability
 from backend.domain.stages import Sleep_Stage, Stage_Segment
+from backend.domain.telemetry import TelemetryPoint
 from backend.domain.timezones import localize
 from backend.processing.timezones import DisplayTimezone, elapsed_seconds, to_display
 
@@ -62,6 +63,7 @@ __all__ = [
     "find_containing_session",
     "no_sleep_session_error",
     "resolve_selection",
+    "attach_telemetry",
 ]
 
 
@@ -767,3 +769,9 @@ def resolve_selection(
     chosen = auto_select(items, display_tz)
     assert chosen is not None  # items is non-empty
     return Selection(chosen, "auto")
+
+
+def attach_telemetry(session: SleepSession, points: Iterable[TelemetryPoint]) -> SleepSession:
+    """Attach exactly the points in the closed session interval, comparing UTC instants."""
+    start, end = _u(session.start_time), _u(session.end_time)
+    return replace(session, telemetry=tuple(p for p in points if start <= _u(p.timestamp) <= end))

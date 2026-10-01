@@ -227,13 +227,11 @@ _FALL_A = datetime(2024, 11, 3, 5, 50, tzinfo=timezone.utc).astimezone(_NY)  # 0
 _FALL_B = datetime(2024, 11, 3, 6, 10, tzinfo=timezone.utc).astimezone(_NY)  # 01:10 EST
 
 
-@pytest.mark.xfail(strict=True, reason="same-ZoneInfo comparison ignores fold across DST fall-back")
 def test_stage_segment_across_dst_fall_back_in_same_zoneinfo():
     segment = Stage_Segment(_FALL_A, _FALL_B, S.deep)
     assert segment.contains(datetime(2024, 11, 3, 6, 0, tzinfo=timezone.utc))
 
 
-@pytest.mark.xfail(strict=True, reason="same-ZoneInfo comparison ignores fold across DST fall-back")
 def test_build_stage_segments_across_dst_fall_back_in_same_zoneinfo():
     start = datetime(2024, 11, 3, 4, 0, tzinfo=timezone.utc).astimezone(_NY)
     end = datetime(2024, 11, 3, 8, 0, tzinfo=timezone.utc).astimezone(_NY)

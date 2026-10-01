@@ -106,6 +106,8 @@ import numpy as np
 
 from backend.domain.errors import Processing_Report
 from backend.domain.features import (
+    MINIMUM_STATE_DURATION_S,
+    Coarse_State,
     FEATURE_WINDOW_SPAN_S,
     SMOOTHING_WINDOW,
     Feature_Series,
@@ -123,7 +125,7 @@ from backend.domain.stages import (
 )
 from backend.domain.telemetry import CONTINUOUS_METRICS, Metric
 from backend.domain.timeline import Aligned_Timeline
-from backend.processing.compression import Night_Compression
+from backend.processing.compression import Night_Compression, night_compression
 from backend.processing.timezones import to_utc
 
 __all__ = [
@@ -141,6 +143,8 @@ __all__ = [
     "movement_intensity_from_mean",
     "window_movement_intensity",
     "assemble_feature_series",
+    "smooth_coarse_states",
+    "extract",
 ]
 
 #: Continuous_Metrics with per-window statistics, in :class:`Metric` declaration order.
@@ -524,3 +528,41 @@ def assemble_feature_series(
         ),
         compression_ratio=compression_ratio,
     )
+
+
+def smooth_coarse_states(stages: Sequence[Sleep_Stage]) -> list[Coarse_State]:
+    """Merge short runs chronologically, recombining equal neighbors to a fixpoint."""
+    states = list(stages)
+    while states:
+        runs: list[tuple[int, int]] = []
+        start = 0
+        for stop in range(1, len(states) + 1):
+            if stop == len(states) or states[stop] != states[start]:
+                runs.append((start, stop))
+                start = stop
+        if len(runs) == 1:
+            break
+        for start, stop in runs:
+            if (stop - start) * FEATURE_WINDOW_SPAN_S < MINIMUM_STATE_DURATION_S:
+                replacement = states[start - 1] if start else states[stop]
+                states[start:stop] = [replacement] * (stop - start)
+                break
+        else:
+            break
+    return states
+
+
+def extract(
+    timeline: Aligned_Timeline, session: SleepSession, target_duration: int
+) -> tuple[Feature_Series, list[Coarse_State], Processing_Report]:
+    """Extract statistics, stage coverage, movement, and smoothed coarse states."""
+    compression = night_compression(session, target_duration)
+    windows = feature_window_bounds(timeline, compression)
+    coverage = window_stage_coverage(session, windows)
+    report = Processing_Report()
+    series = assemble_feature_series(
+        windows, metric_window_features(timeline, windows),
+        [c.stage_fractions for c in coverage], [c.dominant_stage for c in coverage],
+        window_movement_intensity(timeline, windows, coverage, report), compression.ratio,
+    )
+    return series, smooth_coarse_states(series.dominant_stages), report

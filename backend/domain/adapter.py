@@ -270,6 +270,8 @@ class LoadResult:
             the date written in that file's name, for adapters whose files are
             dated by name (the Fitbit_Importer uses it for the selection
             window, Requirement 4.5). Empty for adapters without dated files.
+        point_files: Optional originating file names, one per telemetry point,
+            in the same order. Used to persist dated-file selection provenance.
     """
 
     telemetry: list[TelemetryPoint] = field(default_factory=list)
@@ -277,6 +279,8 @@ class LoadResult:
     session_hrv: list[SessionHrvRow] = field(default_factory=list)
     report: Import_Report = field(default_factory=Import_Report)
     file_dates: dict[str, date] = field(default_factory=dict)
+    # Optional provenance, in telemetry order; used for dated Fitbit file selection.
+    point_files: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

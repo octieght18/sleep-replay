@@ -9,7 +9,7 @@ import pytest
 from backend.domain.errors import PERSISTED_DATA_UNREADABLE, Import_Report, User_Error
 from backend.domain.session import SleepSession
 from backend.domain.stages import Sleep_Stage, Stage_Segment
-from backend.persistence.metadata_store import METADATA_DB_FILENAME, FileRecord, MetadataStore
+from backend.persistence.metadata_store import METADATA_DB_FILENAME, SCHEMA_VERSION, FileRecord, MetadataStore
 
 TZ = timezone(timedelta(hours=-5))
 START = datetime(2024, 3, 9, 23, 0, tzinfo=TZ)
@@ -112,3 +112,25 @@ def test_corrupt_database_is_unreadable_and_file_is_released(tmp_path) -> None:
     store.close()
     store.close()
     db.unlink()
+
+
+def test_schema_one_migrates_without_losing_imports_and_context_round_trips(tmp_path):
+    import sqlite3
+    with MetadataStore(tmp_path) as store:
+        store.record_import("prior", "fitbit", ["sleep.json"], sessions=[_session()])
+        store.set_setting("keep", 180)
+    with sqlite3.connect(tmp_path / METADATA_DB_FILENAME) as conn:
+        conn.execute("DROP TABLE import_context")
+        conn.execute("PRAGMA user_version = 1")
+    context = {"point_files": ["heart_rate.json"], "session_hrv": [{"date": "2024-03-10", "rmssd": 42}]}
+    with MetadataStore(tmp_path) as store:
+        assert store.list_import_ids() == ["prior"]
+        assert store.get_import_context("prior") == {}
+        assert store.get_setting("keep") == 180
+        assert store.list_candidate_sessions()[0][1] == _session()
+        store.record_import("new", "fitbit", ["heart_rate.json"], context=context)
+    with MetadataStore(tmp_path) as store:
+        assert store.get_import_context("new") == context
+        assert store._connection().execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+        store.delete_import("new")
+        assert store.get_import_context("new") == {}

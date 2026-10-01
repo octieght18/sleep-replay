@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import cached_property
 from typing import TYPE_CHECKING, Literal
 
@@ -69,7 +69,7 @@ class SleepSession:
         if not isinstance(self.telemetry, tuple):
             object.__setattr__(self, "telemetry", tuple(self.telemetry))
         object.__setattr__(
-            self, "_stage_starts", tuple(s.start_time for s in self.stages)
+            self, "_stage_starts", tuple(s.start_time.astimezone(timezone.utc) for s in self.stages)
         )
 
     # --- Derived values -------------------------------------------------
@@ -89,7 +89,7 @@ class SleepSession:
         segments = self._sleep_segments
         if not segments:
             return None
-        return min(s.start_time for s in segments)
+        return min((s.start_time for s in segments), key=lambda t: t.astimezone(timezone.utc))
 
     @property
     def final_wake_time(self) -> datetime | None:
@@ -100,7 +100,7 @@ class SleepSession:
         segments = self._sleep_segments
         if not segments:
             return None
-        return max(s.end_time for s in segments)
+        return max((s.end_time for s in segments), key=lambda t: t.astimezone(timezone.utc))
 
     @property
     def has_stage_data(self) -> bool:
@@ -129,7 +129,7 @@ class SleepSession:
         session without stages and instants outside the session, are
         ``unknown`` (Requirement 2.4). ``instant`` must be timezone-aware.
         """
-        idx = bisect_right(self._stage_starts, instant) - 1
+        idx = bisect_right(self._stage_starts, instant.astimezone(timezone.utc)) - 1
         if idx >= 0:
             segment = self.stages[idx]
             if segment.contains(instant):

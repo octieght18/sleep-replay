@@ -81,7 +81,7 @@ __all__ = [
 #: File name of the database inside the Data_Directory.
 METADATA_DB_FILENAME = "metadata.sqlite3"
 #: Stored in ``PRAGMA user_version``; a newer database is refused as unreadable.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 #: Key under which :attr:`ImportRecord.file_metadata` exposes a file's date.
 FILE_DATE_KEY = "file_date"
 
@@ -92,6 +92,12 @@ SELECTION_KINDS: frozenset[str] = frozenset(get_args(SelectionKind))
 _RECORD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 
 _SCHEMA: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS import_context (
+        import_id TEXT PRIMARY KEY REFERENCES imports(import_id) ON DELETE CASCADE,
+        context TEXT NOT NULL
+    )
+    """,
     """
     CREATE TABLE IF NOT EXISTS imports (
         seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -578,6 +584,7 @@ class MetadataStore:
         telemetry_file: str | None = None,
         import_report: Import_Report | None = None,
         sessions: Iterable[SleepSession] = (),
+        context: Mapping[str, Any] | None = None,
         replace: bool = False,
     ) -> ImportRecord:
         """Store an import record, its files, and its candidate sessions in one transaction.
@@ -646,6 +653,8 @@ class MetadataStore:
                 f"INSERT INTO sessions (import_id, position, {_SESSION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 session_rows,
             )
+            conn.execute("INSERT INTO import_context (import_id, context) VALUES (?, ?)",
+                         (import_id, _dumps(dict(context or {}), "import context")))
             record = self.get_import(import_id)
         assert record is not None
         return record
@@ -721,6 +730,16 @@ class MetadataStore:
     def list_import_ids(self) -> list[str]:
         with self._reading() as conn:
             return [row[0] for row in conn.execute("SELECT import_id FROM imports ORDER BY seq")]
+
+    def get_import_context(self, import_id: str) -> dict[str, Any]:
+        """Restart-safe provenance, daily HRV rows, and timezone inputs for an import."""
+        validate_record_id(import_id, "import_id")
+        with self._reading() as conn:
+            row = conn.execute("SELECT context FROM import_context WHERE import_id = ?", (import_id,)).fetchone()
+            context = {} if row is None else _loads(row[0])
+            if not isinstance(context, dict):
+                raise _CorruptRow("invalid import context")
+            return context
 
     def list_candidate_sessions(self, import_id: str | None = None) -> list[tuple[str, SleepSession]]:
         """``(import_id, session)`` pairs, in import order then stored order.

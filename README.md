@@ -71,6 +71,7 @@ backend/
 tests/          # pytest + Hypothesis test suite
 plan/specs/     # full requirements/design/tasks specs (see below)
 sample_data/    # synthetic sample dataset
+tools/          # deterministic sample-data generator
 ```
 
 ## Setup
@@ -94,6 +95,55 @@ python -m pytest
 The suite uses pytest with property-based tests via Hypothesis and covers the
 domain model, importers, timezone handling, alignment, compression, feature
 extraction, event detection, and persistence.
+
+## Try the data pipeline
+
+The data pipeline is available as a local Python service. HTTP, audio rendering,
+and the browser UI belong to the other specs and remain planned.
+
+```python
+from backend.api.pipeline import Pipeline
+
+with Pipeline() as pipeline:
+    report, candidates = pipeline.use_sample_data()
+    result = pipeline.process(180)
+    print(len(candidates), len(result.features), len(result.events))  # 1, 360, 12
+```
+
+`Pipeline.import_files(source_id, files, tz_overrides)` imports real local exports.
+The built-in source identifiers are `fitbit` and `sensorpush`. Register additional
+adapters through `pipeline.registry.register(adapter)`. Use `select_session()` to
+choose a candidate or `define_manual_range(start, end)` to define a session.
+Imports and explicit selections survive restart. An import without a sleep log
+raises `NO_SLEEP_SESSION` while keeping its telemetry for a later manual range.
+
+Set `SLEEP_REPLAY_DATA_DIR` to choose where telemetry and SQLite records are
+stored. Otherwise the default is `%LOCALAPPDATA%\SleepReplay` on Windows,
+`~/Library/Application Support/SleepReplay` on macOS, or
+`$XDG_DATA_HOME/sleep-replay` on Linux (falling back to
+`~/.local/share/sleep-replay`). Set `SLEEP_REPLAY_DISPLAY_TIMEZONE` to an IANA
+name such as `America/New_York`; the default is the host timezone, with UTC
+and a warning when it cannot be determined. Startup checks storage before
+reading input. Import and processing require no credentials or network access.
+
+## Synthetic sample data
+
+The files in `sample_data/` were produced by `tools.sample_data_generator`, are
+unrelated to any real person, and describe an eight-hour night in
+`America/New_York` on March 1–2, 2024, with no daylight saving transition.
+The documented seed is `20240301`. Regenerate byte-identical files with:
+
+```powershell
+python -m tools.sample_data_generator --seed 20240301 --out sample_data
+```
+
+The generator validates sleep cycles, awakenings, heart rate and HRV, movement
+bursts and restless periods, environmental changes, and missing-data gaps.
+All synthetic timestamps are written in the sample timezone, including Fitbit
+heart rate and steps. `use_sample_data()` supplies the required timezone
+overrides independently of the host timezone. For manual sample imports, use
+`America/New_York` for all sample file types, including `fitbit_heart_rate`
+and `fitbit_steps` whose usual default for real Fitbit exports is UTC.
 
 ## Project status
 

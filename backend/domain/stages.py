@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import heapq
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from types import MappingProxyType
 from typing import Iterable, Mapping
@@ -96,14 +96,14 @@ class Stage_Segment:
             raise ValueError("Stage_Segment.start_time must be timezone-aware")
         if self.end_time.tzinfo is None or self.end_time.utcoffset() is None:
             raise ValueError("Stage_Segment.end_time must be timezone-aware")
-        if self.end_time <= self.start_time:
+        if self.end_time.astimezone(timezone.utc) <= self.start_time.astimezone(timezone.utc):
             raise ValueError("Stage_Segment.end_time must be later than start_time")
         if not isinstance(self.stage, Sleep_Stage):
             raise TypeError("Stage_Segment.stage must be a Sleep_Stage")
 
     def contains(self, instant: datetime) -> bool:
         """True when ``start_time <= instant < end_time`` (half-open)."""
-        return self.start_time <= instant < self.end_time
+        return self.start_time.astimezone(timezone.utc) <= instant.astimezone(timezone.utc) < self.end_time.astimezone(timezone.utc)
 
 
 @dataclass(frozen=True)
@@ -160,7 +160,8 @@ def build_stage_segments(
     """
     _require_aware(session_start, "session_start")
     _require_aware(session_end, "session_end")
-    if session_end <= session_start:
+    utc = lambda t: t.astimezone(timezone.utc)
+    if utc(session_end) <= utc(session_start):
         return []
 
     # Clip, discard empty, and remember source order.
@@ -168,9 +169,9 @@ def build_stage_segments(
     for index, interval in enumerate(intervals):
         _require_aware(interval.start_time, "Stage_Interval.start_time")
         _require_aware(interval.end_time, "Stage_Interval.end_time")
-        start = max(interval.start_time, session_start)
-        end = min(interval.end_time, session_end)
-        if end > start:
+        start = max(interval.start_time, session_start, key=utc)
+        end = min(interval.end_time, session_end, key=utc)
+        if utc(end) > utc(start):
             clipped.append((index, start, end, interval))
     if not clipped:
         return []
@@ -178,33 +179,33 @@ def build_stage_segments(
     # Elementary boundaries, deduplicated by instant (first occurrence kept).
     boundary_by_instant: dict[datetime, datetime] = {}
     for _, start, end, _ in clipped:
-        boundary_by_instant.setdefault(start, start)
-        boundary_by_instant.setdefault(end, end)
-    boundaries = sorted(boundary_by_instant.values())
+        boundary_by_instant.setdefault(utc(start), start)
+        boundary_by_instant.setdefault(utc(end), end)
+    boundaries = sorted(boundary_by_instant.values(), key=utc)
 
     # Sweep the elementary slices, keeping active intervals in a max-heap on
     # (is_brief_awakening, start_time, source_index); heapq is a min-heap, so
     # the key is negated. Expired intervals are removed lazily from the top.
     # The rank in `order` (sorted by start, then source index) encodes the
     # "later start, then later source order" tie-break.
-    order = sorted(range(len(clipped)), key=lambda i: (clipped[i][1], clipped[i][0]))
+    order = sorted(range(len(clipped)), key=lambda i: (utc(clipped[i][1]), clipped[i][0]))
     heap: list[tuple[int, int, int]] = []
     next_rank = 0
 
     # Pieces: [winner position in `clipped`, piece start, piece end].
     pieces: list[list] = []
     for slice_start, slice_end in zip(boundaries, boundaries[1:]):
-        while next_rank < len(order) and clipped[order[next_rank]][1] <= slice_start:
+        while next_rank < len(order) and utc(clipped[order[next_rank]][1]) <= utc(slice_start):
             pos = order[next_rank]
             is_brief = bool(clipped[pos][3].is_brief_awakening)
             heapq.heappush(heap, (-int(is_brief), -next_rank, pos))
             next_rank += 1
-        while heap and clipped[heap[0][2]][2] <= slice_start:
+        while heap and utc(clipped[heap[0][2]][2]) <= utc(slice_start):
             heapq.heappop(heap)
         if not heap:
             continue  # Uncovered slice: stays unknown (Requirement 2.4).
         winner = heap[0][2]
-        if pieces and pieces[-1][0] == winner and pieces[-1][2] == slice_start:
+        if pieces and pieces[-1][0] == winner and utc(pieces[-1][2]) == utc(slice_start):
             pieces[-1][2] = slice_end  # Same source interval continues.
         else:
             pieces.append([winner, slice_start, slice_end])

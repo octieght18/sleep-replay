@@ -303,6 +303,7 @@ def _load_export(
         windowed = set(files_in_selection_window(dated, selection.start_time, selection.end_time, display_tz))
 
     telemetry: list[TelemetryPoint] = []
+    point_files: list[str] = []
     sessions: list[SleepSession] = []
     hrv_rows: list[SessionHrvRow] = []
     loaded_metrics: set[Metric] = set()
@@ -337,6 +338,7 @@ def _load_export(
             if result.skipped:
                 continue
             telemetry.extend(result.points)
+            point_files.extend([ref.name] * len(result.points))
             loaded_metrics.add(_FILE_TYPE_METRIC[file_type])
         report.accepted_files.append(ref.name)
 
@@ -347,6 +349,7 @@ def _load_export(
         session_hrv=hrv_rows,
         report=report,
         file_dates=file_dates,
+        point_files=point_files,
     )
 
 

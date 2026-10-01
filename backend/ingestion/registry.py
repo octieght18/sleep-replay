@@ -50,7 +50,7 @@ import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from types import MappingProxyType
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -278,6 +278,8 @@ class ImportRecord:
         session_hrv: Daily HRV summary rows from the adapter.
         display_timezone: IANA name of the Display_Timezone at import start.
         source_timezone_overrides: File type -> IANA override used.
+        file_dates: File name -> date extracted from its name, where supplied.
+        point_files: Optional file provenance, parallel to retained telemetry.
     """
 
     import_id: str
@@ -290,6 +292,8 @@ class ImportRecord:
     session_hrv: tuple[SessionHrvRow, ...] = ()
     display_timezone: str = "UTC"
     source_timezone_overrides: Mapping[str, str] = field(default_factory=dict)
+    file_dates: Mapping[str, date] = field(default_factory=dict)
+    point_files: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -495,6 +499,16 @@ class AdapterRegistry:
             loaded = adapter.load(source, tz_context)
             if not isinstance(loaded, LoadResult):
                 raise TypeError("load() must return a LoadResult")
+            point_files = tuple(loaded.point_files)
+            file_dates = dict(loaded.file_dates)
+            session_hrv = tuple(loaded.session_hrv)
+            if point_files and len(point_files) != len(loaded.telemetry):
+                raise ValueError("point_files must have one entry per returned point")
+            if any(not isinstance(name, str) or not name for name in point_files):
+                raise ValueError("point_files must contain non-empty file names")
+            if any(not isinstance(name, str) or not name or not isinstance(day, date)
+                   or isinstance(day, datetime) for name, day in file_dates.items()):
+                raise ValueError("file_dates must map file names to dates")
             candidates = tuple(candidate_sessions_of(adapter, source, tz_context))
         except User_Error as exc:
             _log.warning("import.failed", import_id=import_id, error_code=exc.code, source_files=list(file_names))
@@ -524,9 +538,14 @@ class AdapterRegistry:
             point_count=len(gate.retained),
             report=report,
             candidate_sessions=candidates,
-            session_hrv=tuple(loaded.session_hrv),
+            session_hrv=session_hrv,
             display_timezone=display_zone.key,
             source_timezone_overrides=tz_context.overrides,
+            file_dates=file_dates,
+            point_files=tuple(
+                name for point, name in zip(loaded.telemetry, point_files)
+                if exclusion_reason(point) is None
+            ),
         )
 
         # 6. Metadata record; on failure remove the telemetry file (atomic import).
