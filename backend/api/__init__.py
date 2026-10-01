@@ -1,1 +1,1 @@
-"""Pipeline service and CLI; HTTP endpoints are tracked by sleep-replay-app."""
+"""Pipeline, CLI, local servers and application HTTP endpoints."""

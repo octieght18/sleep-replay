@@ -67,24 +67,93 @@ backend/
   persistence/  # data directory, metadata + telemetry stores, safe logging
   sonification/ # mapping configuration, render plans, manifests, generation
   audio/        # deterministic stereo PCM WAV synthesis
-  api/          # pipeline service and CLI; HTTP API remains planned
+  api/          # pipeline service and CLI; HTTP API, settings, replay cache, local startup
 tests/          # pytest + Hypothesis test suite
 plan/specs/     # full requirements/design/tasks specs (see below)
 sample_data/    # synthetic sample dataset
 tools/          # deterministic sample-data generator
 examples/       # playable sample WAV and its replay manifest
-docs/           # example mapping configuration
+docs/           # user, format, architecture, mapping, CLI and troubleshooting guides
 ```
 
-## Setup
+## Run locally (Docker is optional)
 
-Requires **Python 3.11+**.
+Requires **Python 3.11+**, Git to clone, and a modern browser. There is no Node.js
+requirement or frontend build step. Network access is only needed to clone and
+install dependencies; the installed app runs offline.
+
+Windows PowerShell, without activation or administrator privileges:
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\activate
-python -m pip install -r requirements.txt
+git clone https://github.com/octieght18/sleep-replay.git
+cd sleep-replay
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m backend.api.run
 ```
+
+Use `py -3.11` instead if multiple installed versions need disambiguation. On
+macOS/Linux:
+
+```bash
+git clone https://github.com/octieght18/sleep-replay.git
+cd sleep-replay
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m backend.api.run
+```
+
+Open **http://127.0.0.1:8734**. Choose **Use sample data**, **Open replay**,
+**Generate replay**, then **Play**. Settings save locally; generating loads at
+00:00 without autoplay. Press Ctrl+C in the terminal to stop both servers.
+The API listens on 127.0.0.1:8735. Startup reports occupied ports and Python
+versions below 3.11 instead of silently selecting other ports.
+
+To start each server in a separate PowerShell terminal after installation:
+
+```powershell
+.\.venv\Scripts\python.exe -m backend.api.app
+```
+
+```powershell
+.\.venv\Scripts\python.exe -m backend.api.static_server
+```
+
+Their macOS/Linux equivalents use `.venv/bin/python` with the same `-m` modules.
+All commands below use `python` from an activated virtual environment, or you
+can substitute the explicit virtual environment executable shown above.
+
+## Optional Docker setup
+
+Requires Docker Engine/Desktop with Docker Compose v2. From the clone root:
+
+```bash
+docker compose up --build
+```
+
+Open the same **http://127.0.0.1:8734** and follow the same sample-data steps.
+Images are exact-version, digest-pinned official Python images from the public
+ECR mirror. Published ports are loopback-only. Docker defaults the display
+zone to UTC; set `SLEEP_REPLAY_DISPLAY_TIMEZONE` before starting to override it.
+The named data volume persists across:
+
+```bash
+docker compose down
+docker compose up
+```
+
+Do not start both variants together on the same ports. Deletion and exposure
+controls are documented in [security and storage](docs/security-and-storage.md).
+
+## Guides
+
+- [Export/import and playback](docs/user-guide.md)
+- [Accepted data formats and timezones](docs/data-formats.md)
+- [Architecture and new source adapters](docs/architecture.md)
+- [Mapping configuration](docs/mapping-config.md) and [commented example](mapping-config.example.yaml)
+- [CLI reference](docs/cli.md)
+- [Local data and security](docs/security-and-storage.md)
+- [Troubleshooting every error code and warning](docs/troubleshooting.md)
 
 ## Running the tests
 
@@ -97,10 +166,23 @@ python -m pytest
 The suite uses pytest with property-based tests via Hypothesis and covers the
 domain model, importers, timezone handling, alignment, compression, feature
 extraction, event detection, persistence, configuration, audio synthesis,
-replay manifests, determinism, graceful degradation, and the CLI. All tests
+replay manifests, determinism, graceful degradation, CLI, API, settings, cache,
+and frontend display logic (embedded JavaScript engine, no Node required). All tests
 write to temporary directories and run offline. Timed generation checks are
 marked `reference_machine`; on slower hardware, deselect them with
 `python -m pytest -m "not reference_machine"`.
+
+Optional Chromium DOM/playback checks (free ports 8734/8735 first):
+
+```bash
+python -m pip install -r requirements-browser.txt
+python -m playwright install chromium
+python -m pytest --run-browser
+```
+
+These browser tests are skipped by the standard command; API and pure frontend
+logic tests always run. Set `SLEEP_REPLAY_BROWSER` to an installed Chromium
+executable to use it instead of downloading a browser.
 
 ## Generate an audio replay
 
@@ -153,7 +235,7 @@ python -m backend.api.cli generate --help
 ## Try the data pipeline
 
 The pipeline and audio generation are available as a local Python service.
-The HTTP API and browser UI remain planned.
+The HTTP API and browser UI wrap the same local service.
 
 ```python
 from backend.api.pipeline import Pipeline
@@ -211,7 +293,7 @@ This repository is being built from three specs (in `plan/specs/`):
 |---|---|---|
 | `sleep-replay-data-pipeline` | Domain model, import, session discovery, alignment, features, events, persistence | Implemented |
 | `sleep-replay-sonification` | Mapping config, soundscape presets, audio rendering, replay manifest, CLI | Implemented |
-| `sleep-replay-app` | Backend API, browser UI, Docker setup, end-to-end flow | Planned |
+| `sleep-replay-app` | Backend API, browser UI, optional Docker setup, end-to-end flow | Implemented |
 
 Each spec contains `requirements.md`, `design.md`, and `tasks.md` with the full
 EARS-style acceptance criteria and design decisions.

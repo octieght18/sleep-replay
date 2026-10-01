@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sleep Replay</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/js/app.js"></script>
+  </head>
+  <body>
+    <header class="shell-header">
+      <a class="brand" href="/" aria-label="Sleep Replay home"
+        ><span class="brand-mark" aria-hidden="true">◒</span> Sleep Replay</a
+      >
+      <nav aria-label="Views">
+        <button type="button" data-view="main" aria-selected="false">
+          Replay
+        </button>
+        <button type="button" data-view="import" aria-selected="true">
+          Import
+        </button>
+        <button type="button" data-view="settings" aria-selected="false">
+          Settings
+        </button>
+      </nav>
+      <span class="local-badge">Local &amp; private</span>
+    </header>
+    <main>
+      <div id="global-error" class="error" role="alert" hidden></div>
+      <section id="import-view" aria-labelledby="import-title">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">YOUR NIGHT, IN SOUND</p>
+            <h1 id="import-title">Bring your night in.</h1>
+            <p>
+              Import your sleep and room exports, or explore the synthetic
+              sample night.
+            </p>
+          </div>
+          <button id="sample-button" class="secondary" type="button">
+            Use sample data
+          </button>
+        </div>
+        <form id="import-form">
+          <div class="source-grid">
+            <label class="source-card"
+              ><span class="source-number">01</span
+              ><strong>Fitbit export</strong
+              ><span>Sleep, heart rate, HRV &amp; steps</span
+              ><input
+                id="fitbit-files"
+                type="file"
+                accept=".json,.csv,.zip"
+                multiple
+              /><small>JSON / CSV files, or one ZIP</small></label
+            >
+            <label class="source-card"
+              ><span class="source-number">02</span
+              ><strong>SensorPush export</strong
+              ><span>Temperature, humidity &amp; pressure</span
+              ><input
+                id="sensorpush-files"
+                type="file"
+                accept=".csv"
+                multiple
+              /><small>One or more CSV files</small></label
+            >
+          </div>
+          <details class="timezone-details">
+            <summary>Source timezones <span id="display-zone"></span></summary>
+            <div id="timezone-fields" class="timezone-grid"></div>
+          </details>
+          <div class="action-row">
+            <button id="import-button" type="submit" class="primary">
+              Import files <span aria-hidden="true">→</span></button
+            ><span id="import-progress" role="status" hidden
+              >Importing your files…</span
+            >
+          </div>
+        </form>
+        <div id="import-error" class="error" role="alert" hidden></div>
+        <div id="import-report" class="report" aria-live="polite" hidden></div>
+      </section>
+      <section id="main-view" aria-labelledby="replay-title" hidden>
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">SLEEP REPLAY</p>
+            <h1 id="replay-title">Your night, replayed.</h1>
+            <p id="session-range">Import a night to begin.</p>
+          </div>
+          <label id="session-selector-wrap" hidden
+            >Sleep session<select id="session-selector"></select
+          ></label>
+        </div>
+        <div id="manual-panel" class="manual-panel" hidden>
+          <p>
+            No sleep session is selected. Import sleep logs or define a range
+            for your imported telemetry.
+          </p>
+          <form id="manual-form">
+            <label
+              >Start time<input
+                id="manual-start"
+                type="datetime-local"
+                required /></label
+            ><label
+              >End time<input
+                id="manual-end"
+                type="datetime-local"
+                required /></label
+            ><button class="secondary" type="submit">Use this range</button>
+          </form>
+        </div>
+        <div class="replay-card">
+          <div class="replay-readout">
+            <div>
+              <span id="state-label"></span><span id="night-time"></span>
+            </div>
+            <div id="environment-values"></div>
+          </div>
+          <div
+            id="timeline"
+            class="timeline"
+            tabindex="0"
+            role="slider"
+            aria-label="Replay position"
+            aria-valuemin="0"
+            aria-valuemax="180"
+            aria-valuenow="0"
+          >
+            <div id="stage-bands" class="stage-bands"></div>
+            <div id="markers"></div>
+            <div id="playhead" class="playhead"></div>
+          </div>
+          <div class="timeline-labels">
+            <span id="position-label">00:00</span
+            ><span id="duration-label">03:00</span>
+          </div>
+          <div class="player-actions">
+            <button id="play-button" class="play-button" type="button" disabled>
+              Play</button
+            ><button
+              id="generate-button"
+              class="primary"
+              type="button"
+              disabled
+            >
+              Generate replay <span aria-hidden="true">→</span></button
+            ><span id="generation-progress" role="status" hidden
+              >Composing your replay…</span
+            >
+          </div>
+        </div>
+        <div id="main-error" class="error" role="alert" hidden></div>
+        <div
+          id="replay-warnings"
+          class="warnings"
+          aria-live="polite"
+          hidden
+        ></div>
+        <audio id="replay-audio" preload="auto"></audio>
+      </section>
+      <section id="settings-view" aria-labelledby="settings-title" hidden>
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow">MAKE IT YOURS</p>
+            <h1 id="settings-title">Shape the sound.</h1>
+            <p>Changes are saved locally. Generate a replay to hear them.</p>
+          </div>
+          <button id="restore-defaults" class="secondary" type="button">
+            Restore mappings
+          </button>
+        </div>
+        <form id="settings-form">
+          <div class="settings-top">
+            <label
+              >Replay duration<select id="target-duration">
+                <option value="30">30 seconds</option>
+                <option value="120">2 minutes</option>
+                <option value="180">3 minutes</option>
+                <option value="300">5 minutes</option>
+                <option value="600">10 minutes</option></select
+              ><small class="field-error" id="duration-error"></small
+            ></label>
+            <label
+              >Random seed<input
+                id="random-seed"
+                type="number"
+                min="0"
+                max="4294967295"
+                step="1" /><small class="field-error" id="seed-error"></small
+            ></label>
+            <label
+              >Display units<select id="display-units">
+                <option value="imperial">Imperial · °F / inHg</option>
+                <option value="metric">Metric · °C / hPa</option></select
+              ><small class="field-error" id="units-error"></small
+            ></label>
+          </div>
+          <div class="mapping-heading">
+            <span>Metric</span><span>Sound parameter</span
+            ><span>Sensitivity</span>
+          </div>
+          <div id="mapping-controls"></div>
+        </form>
+        <p id="settings-status" role="status">
+          Settings are saved automatically.
+        </p>
+        <div id="settings-error" class="error" role="alert" hidden></div>
+      </section>
+    </main>
+    <footer id="disclaimer" class="medical-note">
+      An aesthetic auditory replay. Not a medical device, diagnostic tool, or
+      alarm.<br />No diagnosis or health advice. These sounds carry no medical
+      meaning.
+    </footer>
+  </body>
+</html>

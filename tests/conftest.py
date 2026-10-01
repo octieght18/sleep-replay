@@ -23,6 +23,18 @@ settings.register_profile("sleep-replay", database=None, deadline=None)
 settings.load_profile("sleep-replay")
 
 
+def pytest_addoption(parser):
+    parser.addoption("--run-browser", action="store_true", help="Run optional Chromium DOM/playback tests")
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--run-browser"):
+        skip = pytest.mark.skip(reason="Optional browser tests: use --run-browser after installing requirements-browser.txt")
+        for item in items:
+            if "browser" in item.keywords:
+                item.add_marker(skip)
+
+
 @pytest.fixture(autouse=True)
 def tmp_data_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point SLEEP_REPLAY_DATA_DIR at a fresh temporary directory for every test.

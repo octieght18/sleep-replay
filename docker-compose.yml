@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    ports:
+      - "127.0.0.1:8735:8735"
+    environment:
+      SLEEP_REPLAY_DATA_DIR: /data
+      SLEEP_REPLAY_DISPLAY_TIMEZONE: "${SLEEP_REPLAY_DISPLAY_TIMEZONE:-UTC}"
+    volumes:
+      - sleep-replay-data:/data
+    restart: unless-stopped
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "127.0.0.1:8734:8734"
+    depends_on:
+      - backend
+    restart: unless-stopped
+volumes:
+  sleep-replay-data:
