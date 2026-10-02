@@ -67,9 +67,10 @@ backend/
   persistence/  # data directory, metadata + telemetry stores, safe logging
   sonification/ # mapping configuration, render plans, manifests, generation
   audio/        # deterministic stereo PCM WAV synthesis
-  api/          # pipeline service and CLI; HTTP API, settings, replay cache, local startup
+  api/          # pipeline, CLI, HTTP API, settings, replay cache, local startup
+frontend/       # local browser UI; no build step
+docker/         # optional pinned container images
 tests/          # pytest + Hypothesis test suite
-plan/specs/     # full requirements/design/tasks specs (see below)
 sample_data/    # synthetic sample dataset
 tools/          # deterministic sample-data generator
 examples/       # playable sample WAV and its replay manifest
@@ -206,11 +207,11 @@ Fitbit intraday exports, heart rate and steps default to UTC; the overrides abov
 are specific to the synthetic dataset. Other file types default to the display
 timezone. An explicit offset in an input timestamp takes precedence.
 
-`--config docs/mapping-config.example.yaml` loads a YAML or JSON mapping;
+`--config mapping-config.example.yaml` loads a YAML or JSON mapping;
 `--target-duration` and `--seed` override that file. Omitted settings use defaults,
 and the CLI ignores previously stored settings and imports. The six metric keys
 map to shared sound parameters with sensitivity, smoothing, and hysteresis.
-The [example configuration](docs/mapping-config.example.yaml) includes all defaults.
+The [example configuration](mapping-config.example.yaml) includes all defaults.
 An invalid configuration applies no values and produces no replay.
 
 Use `--session-date YYYY-MM-DD` to select by the session's end date. For room data
@@ -284,19 +285,6 @@ heart rate and steps. `use_sample_data()` supplies the required timezone
 overrides independently of the host timezone. For manual sample imports, use
 `America/New_York` for all sample file types, including `fitbit_heart_rate`
 and `fitbit_steps` whose usual default for real Fitbit exports is UTC.
-
-## Project status
-
-This repository is being built from three specs (in `plan/specs/`):
-
-| Spec | Scope | Status |
-|---|---|---|
-| `sleep-replay-data-pipeline` | Domain model, import, session discovery, alignment, features, events, persistence | Implemented |
-| `sleep-replay-sonification` | Mapping config, soundscape presets, audio rendering, replay manifest, CLI | Implemented |
-| `sleep-replay-app` | Backend API, browser UI, optional Docker setup, end-to-end flow | Implemented |
-
-Each spec contains `requirements.md`, `design.md`, and `tasks.md` with the full
-EARS-style acceptance criteria and design decisions.
 
 ## Non-goals (MVP)
 

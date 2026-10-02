@@ -1,6 +1,6 @@
 """Property tests for backend.processing.compression (Requirement 11).
 
-Each test is tagged with its design.md Correctness Property.
+Each test is tagged with the compression property it verifies.
 """
 
 from __future__ import annotations

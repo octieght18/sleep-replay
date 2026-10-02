@@ -1,4 +1,4 @@
-"""Smoke tests for the Backend package skeleton and the shared test fixtures."""
+"""Smoke tests for the Backend packages and shared test fixtures."""
 
 from __future__ import annotations
 
