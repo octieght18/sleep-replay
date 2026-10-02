@@ -1,8 +1,8 @@
 """Input_Fingerprint: SHA-256 of a SleepSession's normalized inputs.
 
 Requirement 9.5 (and the Input_Fingerprint glossary entry). The fingerprint
-covers the session bounds, every TelemetryPoint, and every Stage_Segment of
-the selected SleepSession. It is deterministic and independent of
+covers the session bounds, every TelemetryPoint, every Stage_Segment, and
+daily Session_HRV context of the selected SleepSession. It is deterministic and independent of
 
 * the input order of TelemetryPoints and Stage_Segments (the records are
   serialized and then sorted as a multiset, so duplicates still count), and
@@ -28,8 +28,8 @@ from backend.domain.telemetry import TelemetryPoint
 
 __all__ = ["FINGERPRINT_VERSION", "input_fingerprint", "fingerprint_inputs"]
 
-#: Bumped whenever the canonical serialization changes.
-FINGERPRINT_VERSION = 1
+#: Latest format; version 1 remains byte-compatible for sessions without daily HRV.
+FINGERPRINT_VERSION = 2
 
 
 def _utc(dt: datetime) -> str:
@@ -73,21 +73,28 @@ def fingerprint_inputs(
     end_time: datetime,
     telemetry: Iterable[TelemetryPoint],
     stages: Iterable[Stage_Segment],
+    *,
+    session_hrv: float | None = None,
 ) -> str:
-    """Input_Fingerprint (lower-case hex SHA-256) of explicit session inputs."""
+    """Input_Fingerprint of explicit inputs, including optional daily HRV."""
     payload = {
-        "version": FINGERPRINT_VERSION,
+        # Version 1 remains valid for nights without daily HRV context.
+        "version": 1 if session_hrv is None else FINGERPRINT_VERSION,
         "session": [_utc(start_time), _utc(end_time)],
         "telemetry": sorted(_point_record(p) for p in telemetry),
         "stages": sorted(_segment_record(s) for s in stages),
     }
+    if session_hrv is not None:
+        payload["session_hrv"] = _number(session_hrv)
     encoded = json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("ascii")
     return hashlib.sha256(encoded).hexdigest()
 
 
 def input_fingerprint(session: SleepSession) -> str:
     """Input_Fingerprint of ``session``: SHA-256 over its UTC bounds and its
-    canonically sorted, UTC-normalized TelemetryPoints and Stage_Segments."""
+    canonically sorted, UTC-normalized TelemetryPoints, Stage_Segments and
+    effective daily HRV context."""
     return fingerprint_inputs(
-        session.start_time, session.end_time, session.telemetry, session.stages
+        session.start_time, session.end_time, session.telemetry, session.stages,
+        session_hrv=session.session_hrv,
     )

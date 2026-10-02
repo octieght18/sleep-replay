@@ -2,7 +2,7 @@
 
 The browser is static HTML/CSS/JavaScript. Python's static server serves it on port 8734 and streams `/api/` requests to FastAPI on port 8735. Both bind loopback by default. `python -m backend.api.run` checks the Python version and reserves both ports before starting both servers. Separate entry points support two terminals or containers. There is no frontend build step.
 
-The application uses one Pipeline, SettingsService and ReplayCache for its lifetime. A lock serializes changes to the selected/imported state; a separate nonblocking generation lock rejects overlapping generation requests. Settings save one complete SQLite record. The replay cache matches normalized input fingerprints, effective mapping configuration (including defaults and seed) and renderer version. Both artifact files must exist and the manifest must validate. A changed display timezone also requires a new manifest.
+The application uses one Pipeline, SettingsService and ReplayCache for its lifetime. A lock serializes changes to the selected/imported state; a separate nonblocking generation lock rejects overlapping generation requests. Settings save one complete SQLite record. The replay cache matches normalized input fingerprints (including effective daily HRV), effective mapping configuration (including defaults and seed) and renderer version. Both artifact files must exist and the manifest must validate. A changed display timezone also requires a new manifest. The browser ignores generation results from before a successful import or session change, and only the latest queued settings save can update its save status.
 
 ## Import to audio
 

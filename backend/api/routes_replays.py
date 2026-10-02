@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 from starlette.responses import MalformedRangeHeader, RangeNotSatisfiable
+from backend.api.audio_response import AudioFileResponse
 
 from backend.domain.errors import User_Error
 from backend.persistence.metadata_store import validate_record_id
@@ -76,25 +77,29 @@ def manifest(request: Request, replay_id: str):
 @router.head("/api/replays/{replay_id}/audio")
 def audio(request: Request, replay_id: str):
     path, _ = stored_paths(request, replay_id)
+    stat = path.stat()
+    response = AudioFileResponse(
+        path,
+        stat_result=stat,
+        media_type="audio/wav",
+        filename=path.name,
+        content_disposition_type="inline",
+        headers={"Cache-Control": "private, no-cache"},
+    )
     # Pinned Starlette returns an empty 416 directly; validate ahead of its
     # streaming response so rejected ranges also have the API error contract.
-    if request.headers.get("range") and not request.headers.get("if-range"):
+    if request.headers.get("range") is not None and (
+        request.headers.get("if-range") is None
+        or response._should_use_range(request.headers["if-range"])
+    ):
         try:
-            FileResponse._parse_range_header(
-                request.headers["range"], path.stat().st_size
-            )
+            response._parse_range_header(request.headers["range"], stat.st_size)
         except MalformedRangeHeader:
             raise HTTPException(400, "The audio byte range is malformed.") from None
         except RangeNotSatisfiable:
             raise HTTPException(
                 416,
                 "The audio byte range is outside this replay.",
-                headers={"Content-Range": f"bytes */{path.stat().st_size}"},
+                headers={"Content-Range": f"bytes */{stat.st_size}"},
             ) from None
-    return FileResponse(
-        path,
-        media_type="audio/wav",
-        filename=path.name,
-        content_disposition_type="inline",
-        headers={"Cache-Control": "private, no-cache"},
-    )
+    return response

@@ -178,11 +178,13 @@ export class SettingsPanel {
     this.state.pendingSettings = job;
     job
       .then(() => {
+        if (this.state.pendingSettings !== job) return;
         document.getElementById("settings-status").textContent =
           "Saved locally.";
         document.getElementById("settings-error").hidden = true;
       })
       .catch((error) => {
+        if (this.state.pendingSettings !== job) return;
         showError(document.getElementById("settings-error"), error);
         document.getElementById("settings-status").textContent =
           "Changes could not be saved. Retry the change before generating.";

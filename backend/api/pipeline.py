@@ -104,10 +104,10 @@ class Pipeline:
         self.close()
 
     def _record_import(self, record: ImportRecord):
-        if not record.point_count and not record.candidate_sessions:
+        if not record.point_count and not record.candidate_sessions and not record.session_hrv:
             raise User_Error(
-                SOURCE_LOAD_FAILED, "No readable telemetry or sleep logs were found in this import.",
-                "Choose a supported export containing measurements or sleep logs and import it again.",
+                SOURCE_LOAD_FAILED, "No readable telemetry, sleep logs, or daily HRV summaries were found in this import.",
+                "Choose a supported export containing measurements, sleep logs, or HRV summaries and import it again.",
                 file_name=", ".join(record.source_files) or None,
             )
         names = list(dict.fromkeys((*record.source_files, *record.report.accepted_files, *record.file_dates)))

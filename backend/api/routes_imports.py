@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.datastructures import UploadFile
+from python_multipart.exceptions import MultipartParseError
 
 from backend.api.errors import request_error
 from backend.api.routes_sessions import session_state
@@ -24,6 +25,11 @@ class LocalMultipartParser(MultiPartParser):
         )
         self.directory, self.limit = directory, limit
         self.received = 0
+        self.completed = False
+
+    def on_end(self):
+        super().on_end()
+        self.completed = True
 
     def on_part_begin(self):
         super().on_part_begin()
@@ -74,6 +80,14 @@ def sample(request: Request):
 
 @router.post("/api/imports")
 async def upload(request: Request):
+    if (
+        request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        != "multipart/form-data"
+    ):
+        raise request_error(
+            "The upload must use multipart/form-data.",
+            "Select the files again and retry the import.",
+        )
     state = request.app.state
     parent = state.pipeline.data_dir / "uploads"
     parent.mkdir(exist_ok=True)
@@ -84,6 +98,10 @@ async def upload(request: Request):
         form = None
         try:
             form = await parser.parse()
+            if not parser.completed:
+                raise MultiPartException(
+                    "The upload ended before its closing boundary."
+                )
             raw_overrides = form.get("timezone_overrides", "{}")
             try:
                 overrides = json.loads(raw_overrides)
@@ -154,7 +172,7 @@ async def upload(request: Request):
                     return report_state(state.pipeline, report)
 
             return await run_in_threadpool(run)
-        except MultiPartException:
+        except (MultiPartException, MultipartParseError):
             raise request_error(
                 "The multipart upload is malformed.",
                 "Select the files again and retry the import.",

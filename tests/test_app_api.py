@@ -210,7 +210,10 @@ def test_legacy_saved_settings_default_to_music_after_restart(tmp_path):
 
 def test_style_switch_creates_distinct_replay_and_cache_survives_restart(tmp_path):
     from backend.audio.renderer import render
-    with TestClient(create_app(tmp_path, display_timezone="America/New_York")) as client:
+
+    with TestClient(
+        create_app(tmp_path, display_timezone="America/New_York")
+    ) as client:
         data = sample_settings(client)
         with patch("backend.sonification.generation.render", wraps=render) as renderer:
             music = client.post("/api/replays").json()
@@ -226,12 +229,15 @@ def test_style_switch_creates_distinct_replay_and_cache_survives_restart(tmp_pat
             assert client.post("/api/replays").json()["cached"]
             audio = client.get(nature["audio_url"]).content
             from sonification_helpers import assert_audio, read_wav
+
             assert_audio(*read_wav(audio), 30)
             data["sound_style"] = "music"
             client.put("/api/settings", json=data)
             assert client.post("/api/replays").json()["id"] == music["id"]
             assert renderer.call_count == 2
-    with TestClient(create_app(tmp_path, display_timezone="America/New_York")) as restarted:
+    with TestClient(
+        create_app(tmp_path, display_timezone="America/New_York")
+    ) as restarted:
         data["sound_style"] = "nature"
         restarted.put("/api/settings", json=data)
         with patch("backend.sonification.generation.render") as renderer:
@@ -317,6 +323,114 @@ def test_origin_guard_blocks_before_action(client):
         client.get("/api/status", headers={"Origin": "https://evil.test"}).status_code
         == 403
     )
+
+
+@pytest.mark.parametrize(
+    "content_type,body",
+    [
+        (None, b""),
+        ("multipart/form-data; boundary=x", b"bad body"),
+        ("application/json", b"{}"),
+    ],
+)
+def test_malformed_upload_is_a_client_error_and_preserves_imports(
+    client, content_type, body
+):
+    sample_settings(client)
+    before = client.get("/api/sessions").json()
+    headers = {} if content_type is None else {"Content-Type": content_type}
+    response = client.post("/api/imports", headers=headers, content=body)
+    assert response.status_code == 400
+    check_error(response, "SOURCE_LOAD_FAILED")
+    assert client.get("/api/sessions").json() == before
+    parent = client.app.state.pipeline.data_dir / "uploads"
+    assert not parent.exists() or not list(parent.iterdir())
+
+
+def test_truncated_multipart_does_not_import_completed_parts(client):
+    contents = (ROOT / "sample_data/sleep-2024-03-01.json").read_bytes()
+    body = (
+        b'--x\r\nContent-Disposition: form-data; name="fitbit"; '
+        b'filename="sleep-2024-03-01.json"\r\n\r\n' + contents + b"\r\n--x\r\n"
+    )
+    response = client.post(
+        "/api/imports",
+        headers={"Content-Type": "multipart/form-data; boundary=x"},
+        content=body,
+    )
+    assert response.status_code == 400
+    check_error(response, "SOURCE_LOAD_FAILED")
+    assert not client.get("/api/status").json()["has_imports"]
+    assert not list((client.app.state.pipeline.data_dir / "uploads").iterdir())
+
+
+def test_hrv_summary_change_invalidates_audio_cache(client):
+    from backend.processing.fingerprint import input_fingerprint
+
+    sleep = (ROOT / "sample_data/sleep-2024-03-01.json").read_bytes()
+    data = DEFAULT_SETTINGS.to_dict()
+    data.update(target_duration=30, sound_style="nature")
+    client.put("/api/settings", json=data)
+    assert (
+        client.post(
+            "/api/imports", files={"fitbit": ("sleep-2024-03-01.json", sleep)}
+        ).status_code
+        == 200
+    )
+    hashes, records, audio = [], [], []
+    for value in (25, 75):
+        summary = f"timestamp,rmssd\n2024-03-02,{value}\n".encode()
+        response = client.post(
+            "/api/imports",
+            files=[
+                (
+                    "fitbit",
+                    ("Daily Heart Rate Variability Summary - 2024-03.csv", summary),
+                ),
+            ],
+        )
+        assert response.status_code == 200
+        assert client.app.state.pipeline.selected_session.session_hrv == (
+            25 if value == 25 else 50
+        )
+        hashes.append(input_fingerprint(client.app.state.pipeline.selected_session))
+        records.append(client.post("/api/replays").json())
+        audio.append(client.get(records[-1]["audio_url"]).content)
+    assert hashes[0] != hashes[1]
+    assert records[0]["id"] != records[1]["id"]
+    assert not records[1]["cached"]
+    assert audio[0] != audio[1]
+    assert client.post("/api/replays").json()["id"] == records[1]["id"]
+
+
+@pytest.mark.parametrize("validator", ["etag", "last-modified"])
+@pytest.mark.parametrize("range_,status", [("bytes=9999999-", 416), ("invalid", 400)])
+def test_conditional_range_errors_are_structured(
+    client, renderer, validator, range_, status
+):
+    sample_settings(client)
+    url = client.post("/api/replays").json()["audio_url"]
+    matching = client.head(url).headers[validator]
+    response = client.get(url, headers={"Range": range_, "If-Range": matching})
+    assert response.status_code == status
+    check_error(response, "SOURCE_LOAD_FAILED")
+    stale = client.get(url, headers={"Range": range_, "If-Range": '"stale"'})
+    assert stale.status_code == 200
+
+
+def test_oversized_suffix_and_mixed_satisfiable_ranges(client, renderer):
+    sample_settings(client)
+    url = client.post("/api/replays").json()["audio_url"]
+    complete = client.get(url).content
+    response = client.get(url, headers={"Range": f"bytes=-{len(complete) + 100}"})
+    assert response.status_code == 206
+    assert response.content == complete
+    assert (
+        response.headers["content-range"]
+        == f"bytes 0-{len(complete) - 1}/{len(complete)}"
+    )
+    response = client.get(url, headers={"Range": "bytes=0-43,9999999-"})
+    assert response.status_code == 206 and response.content == complete[:44]
 
 
 def test_api_flow_cache_range_and_changed_settings(client, renderer):

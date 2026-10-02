@@ -245,6 +245,27 @@ def test_file_date_filter_and_daily_hrv_survive_restart(tmp_data_dir):
         assert pipeline.selected_session.session_hrv == 50
 
 
+@pytest.mark.parametrize("summary_first", [False, True])
+def test_summary_only_import_persists_and_attaches_after_restart(tmp_data_dir, summary_first):
+    summary = tmp_data_dir / "Daily Heart Rate Variability Summary - 2024-03.csv"
+    summary.write_text("timestamp,rmssd\n2024-03-02,40\n")
+    with Pipeline(display_timezone="America/New_York") as pipeline:
+        if summary_first:
+            with pytest.raises(User_Error) as error:
+                pipeline.import_files("fitbit", [summary])
+            assert error.value.code == "NO_SLEEP_SESSION"
+            assert len(pipeline.metadata_store.list_import_ids()) == 1
+        else:
+            pipeline.import_files("fitbit", [SAMPLE_DIR / "sleep-2024-03-01.json"])
+            report, _ = pipeline.import_files("fitbit", [summary])
+            assert report.accepted_files == [summary.name]
+            assert pipeline.selected_session.session_hrv == 40
+    with Pipeline(display_timezone="America/New_York") as reopened:
+        if summary_first:
+            reopened.import_files("fitbit", [SAMPLE_DIR / "sleep-2024-03-01.json"])
+        assert reopened.selected_session.session_hrv == 40
+
+
 def test_user_selection_persists_and_follows_overlap_merge(tmp_data_dir):
     def session(start, end, stage):
         return SleepSession(start, end, "test_adapter", (Stage_Segment(start, end, stage),))

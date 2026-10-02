@@ -23,6 +23,8 @@ export class MainScreen {
   constructor(state, timeline) {
     this.state = state;
     this.timeline = timeline;
+    this.sessionRevision = 0;
+    this.generating = false;
     document
       .getElementById("generate-button")
       .addEventListener("click", () => this.generate());
@@ -38,7 +40,8 @@ export class MainScreen {
     this.state.sessions = data;
     const session = data?.selected;
     document.getElementById("manual-panel").hidden = !!session;
-    document.getElementById("generate-button").disabled = !session;
+    document.getElementById("generate-button").disabled =
+      this.generating || !session;
     document.getElementById("replay-title").textContent = session
       ? sessionLabel(session, data.display_timezone)
       : "Your night, replayed.";
@@ -58,6 +61,7 @@ export class MainScreen {
       (data?.sessions?.length || 0) < 2;
   }
   unload() {
+    this.sessionRevision += 1;
     this.timeline.unload(this.state.settings.target_duration);
     document.getElementById("replay-style").hidden = true;
     document.getElementById("replay-warnings").hidden = true;
@@ -93,6 +97,9 @@ export class MainScreen {
     }
   }
   async generate() {
+    if (this.generating) return;
+    this.generating = true;
+    const revision = this.sessionRevision;
     this.timeline.audio.pause();
     this.timeline.setBusy(true);
     document.getElementById("main-error").hidden = true;
@@ -104,8 +111,11 @@ export class MainScreen {
     document.getElementById("generation-progress").hidden = false;
     try {
       if (this.state.pendingSettings) await this.state.pendingSettings;
+      if (revision !== this.sessionRevision) return;
       const replay = await api("/api/replays", { method: "POST" });
+      if (revision !== this.sessionRevision) return;
       const manifest = await api(replay.manifest_url);
+      if (revision !== this.sessionRevision) return;
       this.timeline.load(manifest, replay.audio_url);
       const style = document.getElementById("replay-style");
       style.textContent =
@@ -128,9 +138,13 @@ export class MainScreen {
       }
       warnings.hidden = !lines.length;
     } catch (error) {
-      showError(document.getElementById("main-error"), error);
+      if (revision === this.sessionRevision)
+        showError(document.getElementById("main-error"), error);
     } finally {
+      this.generating = false;
       controls.forEach((c) => (c.disabled = false));
+      document.getElementById("generate-button").disabled =
+        !this.state.sessions?.selected;
       document.getElementById("generation-progress").hidden = true;
       this.timeline.setBusy(false);
     }

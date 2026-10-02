@@ -210,7 +210,9 @@ def test_nature_playback_license_style_switch_and_loaded_replay(page):
     page.locator("#sound-style").select_option("nature")
     page.locator('[data-view="main"]').click()
     page.locator("#generate-button").click()
-    page.wait_for_function("() => document.getElementById('replay-audio').readyState>=2")
+    page.wait_for_function(
+        "() => document.getElementById('replay-audio').readyState>=2"
+    )
     assert page.locator("#replay-style").inner_text() == "Nature · CC0 audio"
     nature_source = page.locator("#replay-audio").get_attribute("src")
     page.locator("#play-button").click()
@@ -223,7 +225,9 @@ def test_nature_playback_license_style_switch_and_loaded_replay(page):
     assert page.locator("#replay-style").inner_text() == "Nature · CC0 audio"
     assert page.locator("#replay-audio").get_attribute("src") == nature_source
     page.locator("#generate-button").click()
-    page.wait_for_function("() => document.getElementById('replay-style').textContent==='Ambient music'")
+    page.wait_for_function(
+        "() => document.getElementById('replay-style').textContent==='Ambient music'"
+    )
     assert page.locator("#replay-audio").get_attribute("src") != nature_source
 
 
@@ -310,3 +314,87 @@ def test_no_session_manual_range_state(page):
     page.locator("#manual-form button").click()
     page.wait_for_function("() => !document.getElementById('generate-button').disabled")
     assert not page.locator("#manual-panel").is_visible()
+
+
+@pytest.mark.parametrize("older_failed", [False, True])
+def test_settings_status_waits_for_the_latest_queued_save(page, older_failed):
+    page.locator('[data-view="settings"]').click()
+    pending = []
+
+    def hold(route):
+        if route.request.method == "PUT":
+            pending.append(route)
+            page.evaluate(f"window.heldSettings = {len(pending)}")
+        else:
+            route.continue_()
+
+    page.route("**/api/settings", hold)
+    page.locator("#target-duration").select_option("30")
+    page.wait_for_function("() => window.heldSettings===1")
+    assert len(pending) == 1
+    page.locator("#random-seed").fill("42")
+    pending[0].fulfill(
+        status=500 if older_failed else 200,
+        content_type="application/json",
+        body=json.dumps(
+            {
+                "code": "SOURCE_LOAD_FAILED",
+                "description": "Old save failed",
+                "action": "Retry.",
+            }
+        )
+        if older_failed
+        else pending[0].request.post_data,
+    )
+    page.wait_for_function("() => window.heldSettings===2")
+    assert len(pending) == 2
+    assert page.locator("#settings-status").inner_text() == "Saving…"
+    assert page.locator("#settings-error").is_hidden()
+    pending[1].fulfill(
+        status=200, content_type="application/json", body=pending[1].request.post_data
+    )
+    page.wait_for_function(
+        "() => document.getElementById('settings-status').textContent==='Saved locally.'"
+    )
+
+
+@pytest.mark.parametrize("older_failed", [False, True])
+def test_import_while_manifest_is_loading_discards_old_generation(page, older_failed):
+    replay(page)
+    pending = []
+
+    def hold(route):
+        pending.append((route, route.fetch()))
+        page.evaluate("window.heldManifest = true")
+
+    page.route("**/api/replays/*/manifest", hold)
+    page.locator("#generate-button").click()
+    page.wait_for_function("() => window.heldManifest===true")
+    assert len(pending) == 1
+    page.locator('[data-view="import"]').click()
+    page.locator("#sample-button").click()
+    page.wait_for_function("() => !document.getElementById('sample-button').disabled")
+    page.get_by_role("button", name="Open replay", exact=True).click()
+    route, response = pending[0]
+    if older_failed:
+        route.fulfill(
+            status=500,
+            content_type="application/json",
+            body=json.dumps(
+                {
+                    "code": "SOURCE_LOAD_FAILED",
+                    "description": "Old generation failed",
+                    "action": "Retry.",
+                }
+            ),
+        )
+    else:
+        route.fulfill(response=response)
+    page.wait_for_function(
+        "() => document.getElementById('generation-progress').hidden"
+    )
+    assert page.locator("#replay-audio").get_attribute("src") is None
+    assert page.locator("#play-button").is_disabled()
+    assert page.locator("#replay-style").is_hidden()
+    assert page.locator("#generate-button").is_enabled()
+    assert page.locator("#main-error").is_hidden()
