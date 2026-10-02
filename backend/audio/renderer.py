@@ -30,6 +30,9 @@ def _gains(spans, times):
 
 
 def render(plan):
+    if plan.sound_style == "nature":
+        from backend.audio.nature import render_nature
+        return render_nature(plan)
     n = plan.target_duration_s * SAMPLE_RATE
     mix = np.empty((n, 2), dtype=np.float64)
     key = replay_key(plan.seed)

@@ -1,6 +1,6 @@
 # Command reference
 
-Run commands from the clone root with its virtual environment Python. Installation and startup are in the [README](../README.md). `python -m backend.api.cli --help` and `generate --help` list options. Successful CLI operations exit 0; structured user/data errors exit 1; invalid argparse syntax exits 2. Error output includes code, description, action and file name where applicable.
+Run commands from the clone root with its virtual environment Python. Installation and startup are in the [README](../README.md). `python -m backend.api.cli --help` and `generate --help` list options. Successful CLI operations exit 0; structured user/data errors and invalid arguments exit 2; internal failures exit 1. Error output includes code, description, action and file name where applicable.
 
 ## `sample-data`
 
@@ -22,6 +22,7 @@ python -m backend.api.cli generate export.zip room.csv --target-duration 180 --o
 | `--config PATH` | UTF-8 YAML/JSON mapping; omitted keys use backend defaults; absent option uses all defaults |
 | `--target-duration INTEGER` | 30, 120, 180, 300 or 600 seconds; config/default 180 otherwise |
 | `--seed INTEGER` | 0–4294967295; config/default 20240301 otherwise |
+| `--sound-style music\|nature` | Ambient music or nature soundscape; config/default music otherwise; [nature sound and license](nature-sound.md) |
 | `--display-timezone IANA_ZONE` | Display zone, otherwise `SLEEP_REPLAY_DISPLAY_TIMEZONE`, host zone, then UTC fallback |
 | `--source-timezone FILE_TYPE=IANA_ZONE` | Repeatable override for one of the six file types listed below |
 | `--session-date YYYY-MM-DD` | Select a session by its end date in the display zone; default detector auto-selection |
@@ -31,7 +32,7 @@ python -m backend.api.cli generate export.zip room.csv --target-duration 180 --o
 
 Each file type has a dedicated override too: `--fitbit-sleep-timezone`, `--fitbit-heart-rate-timezone`, `--fitbit-steps-timezone`, `--fitbit-hrv-details-timezone`, `--fitbit-hrv-summary-timezone`, `--sensorpush-timezone`. They correspond to `fitbit_sleep`, `fitbit_heart_rate`, `fitbit_steps`, `fitbit_hrv_details`, `fitbit_hrv_summary`, `sensorpush`. Dedicated options take precedence over repeated generic options; explicit input timestamp offsets take precedence over both. Heart rate/steps default to UTC; the other four default to the display zone.
 
-CLI duration/seed override the mapping file. A command uses only its supplied files and configuration; persisted browser settings/imports do not affect the result. On success it prints paths, selected session, compression ratio, event count and warnings. Earlier replays and destination files are preserved on failure.
+CLI duration/seed/sound-style override the mapping file. A command uses only its supplied files and configuration; persisted browser settings/imports do not affect the result. On success it prints paths, selected session, compression ratio, event count and warnings. Earlier replays and destination files are preserved on failure.
 
 Synthetic example, with the required sample intraday timezone overrides:
 

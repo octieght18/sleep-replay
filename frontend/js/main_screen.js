@@ -59,6 +59,7 @@ export class MainScreen {
   }
   unload() {
     this.timeline.unload(this.state.settings.target_duration);
+    document.getElementById("replay-style").hidden = true;
     document.getElementById("replay-warnings").hidden = true;
     document.getElementById("main-error").hidden = true;
   }
@@ -106,6 +107,12 @@ export class MainScreen {
       const replay = await api("/api/replays", { method: "POST" });
       const manifest = await api(replay.manifest_url);
       this.timeline.load(manifest, replay.audio_url);
+      const style = document.getElementById("replay-style");
+      style.textContent =
+        manifest.mapping_config.sound_style === "nature"
+          ? "Nature · CC0 audio"
+          : "Ambient music";
+      style.hidden = false;
       const warnings = document.getElementById("replay-warnings");
       warnings.replaceChildren();
       const lines = [

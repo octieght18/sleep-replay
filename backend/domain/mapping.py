@@ -16,6 +16,7 @@ HYSTERESIS_MAX = MappingProxyType(dict(heart_rate=10, hrv=20, temperature=1, hum
 TARGET_DURATIONS = (30, 120, 180, 300, 600)
 DEFAULT_RANDOM_SEED = 20240301
 MAX_RANDOM_SEED = 2**32 - 1
+SOUND_STYLES = ("music", "nature")
 
 
 def invalid_config(path: str, allowed: str) -> User_Error:
@@ -47,6 +48,7 @@ class Mapping_Config:
     metrics: Mapping[str, Metric_Mapping]
     target_duration: int = 180
     random_seed: int = DEFAULT_RANDOM_SEED
+    sound_style: str = "music"
 
     def __post_init__(self):
         object.__setattr__(self, "metrics", MappingProxyType(dict(self.metrics)))
@@ -54,6 +56,8 @@ class Mapping_Config:
 
 
 def validate_mapping(config: Mapping_Config):
+    if config.sound_style not in SOUND_STYLES:
+        raise invalid_config("sound_style", "music or nature")
     if set(config.metrics) != set(METRIC_KEYS):
         raise invalid_config("metrics", "exactly these metric keys: " + ", ".join(METRIC_KEYS))
     for key, m in config.metrics.items():
@@ -88,13 +92,17 @@ def mapping_dict(config: Mapping_Config) -> dict:
         result[key] = {"target": m.target.value, "sensitivity": float(m.sensitivity) if m.sensitivity else 0.0}
         if key != "movement":
             result[key].update(smoothing_minutes=m.smoothing_minutes, hysteresis=float(m.hysteresis) if m.hysteresis else 0.0)
-    return dict(result, target_duration=config.target_duration, random_seed=config.random_seed)
+    result.update(target_duration=config.target_duration, random_seed=config.random_seed)
+    # Keep legacy music configurations and cache keys byte-compatible.
+    if config.sound_style != "music":
+        result["sound_style"] = config.sound_style
+    return result
 
 
 def mapping_from_dict(data: object) -> Mapping_Config:
     if not isinstance(data, dict):
         raise invalid_config("document", "a mapping of metric keys, target_duration, and random_seed")
-    allowed = (*METRIC_KEYS, "target_duration", "random_seed")
+    allowed = (*METRIC_KEYS, "target_duration", "random_seed", "sound_style")
     for key in data:
         if key not in allowed:
             raise invalid_config(str(key), "allowed keys: " + ", ".join(allowed))
@@ -115,4 +123,4 @@ def mapping_from_dict(data: object) -> Mapping_Config:
         metrics[key] = Metric_Mapping(target, entry.get("sensitivity", default.sensitivity),
                                     entry.get("smoothing_minutes", default.smoothing_minutes),
                                     entry.get("hysteresis", default.hysteresis))
-    return Mapping_Config(metrics, data.get("target_duration", 180), data.get("random_seed", DEFAULT_RANDOM_SEED))
+    return Mapping_Config(metrics, data.get("target_duration", 180), data.get("random_seed", DEFAULT_RANDOM_SEED), data.get("sound_style", "music"))

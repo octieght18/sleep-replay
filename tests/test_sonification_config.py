@@ -19,7 +19,7 @@ def configs(draw):
         metrics[key] = Metric_Mapping(draw(st.sampled_from(tuple(Mapping_Target))), draw(st.floats(0, 1)),
             None if key == "movement" else draw(st.integers(1, 60)),
             None if key == "movement" else draw(st.floats(0, HYSTERESIS_MAX[key])))
-    return Mapping_Config(metrics, draw(st.sampled_from((30, 120, 180, 300, 600))), draw(st.integers(0, 2**32 - 1)))
+    return Mapping_Config(metrics, draw(st.sampled_from((30, 120, 180, 300, 600))), draw(st.integers(0, 2**32 - 1)), draw(st.sampled_from(("music", "nature"))))
 
 
 # Feature: sleep-replay-sonification, Property 1: Mapping_Config parse-print-parse round trip

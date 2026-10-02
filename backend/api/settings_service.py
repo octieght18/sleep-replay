@@ -31,6 +31,7 @@ class Settings:
     sensitivities: dict
     random_seed: int
     display_units: str
+    sound_style: str = "music"
 
     def __post_init__(self):
         validate_target_duration(self.target_duration)
@@ -71,7 +72,7 @@ class Settings:
             data[key].update(
                 target=self.targets[key], sensitivity=self.sensitivities[key]
             )
-        data.update(target_duration=self.target_duration, random_seed=self.random_seed)
+        data.update(target_duration=self.target_duration, random_seed=self.random_seed, sound_style=self.sound_style)
         return parse_config(json.dumps(data))
 
     def to_dict(self):
@@ -81,12 +82,13 @@ class Settings:
             sensitivities=dict(self.sensitivities),
             random_seed=self.random_seed,
             display_units=self.display_units,
+            sound_style=self.sound_style,
         )
 
     @classmethod
     def from_dict(cls, data):
         expected = set(DEFAULT_SETTINGS.to_dict())
-        if not isinstance(data, dict) or set(data) != expected:
+        if not isinstance(data, dict) or set(data) not in (expected, expected - {"sound_style"}):
             raise invalid(
                 "settings", "exactly these fields: " + ", ".join(sorted(expected))
             )

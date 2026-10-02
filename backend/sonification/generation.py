@@ -11,6 +11,7 @@ from pathlib import Path
 from backend.audio.loudness import quantize, scale_loudness
 from backend.audio.renderer import render
 from backend.audio.wav import wav_bytes
+from backend.domain.audio_provenance import MUSIC_VERSION, replay_version
 from backend.domain.errors import User_Error
 from backend.domain.mapping import DEFAULT_MAPPING, FEATURE_METRICS, METRIC_KEYS, mapping_dict, validate_seed
 from backend.domain.replay import Metric_Availability, Night_Event_Record, Replay_Manifest
@@ -22,7 +23,7 @@ from backend.sonification.contributions import window_spans
 from backend.sonification.engine import build_render_plan
 from backend.sonification.manifest import serialize_manifest
 
-REPLAY_VERSION = "0.2.0"
+REPLAY_VERSION = MUSIC_VERSION  # Legacy public music version remains stable.
 
 
 @dataclass(frozen=True)
@@ -141,7 +142,7 @@ def generate_replay(session, timeline, features, coarse_states, night_events, *,
         state_segments(features, coarse_states),
         tuple(Night_Event_Record(e.type.value, e.night_time.astimezone(zone), e.replay_time_s, e.magnitude, e.label) for e in night_events),
         environmental, availability, tuple(k for k in METRIC_KEYS if availability[k].status == "unavailable"),
-        config, effective_seed, input_fingerprint or fingerprint_for(session), REPLAY_VERSION, tuple(dict.fromkeys(warnings)))
+        config, effective_seed, input_fingerprint or fingerprint_for(session), replay_version(config), tuple(dict.fromkeys(warnings)))
     manifest_bytes = serialize_manifest(manifest)
     directory = Path(data_dir).resolve()
     replay_id = uuid.uuid4().hex
@@ -164,7 +165,7 @@ def generate_replay(session, timeline, features, coarse_states, night_events, *,
                 store.record_replay(replay_id, session_start=session.start_time, session_end=session.end_time,
                     target_duration_s=config.target_duration, wav_file=wav_path.relative_to(directory).as_posix(),
                     metadata={"manifest_file": manifest_path.relative_to(directory).as_posix(),
-                              "input_fingerprint": manifest.input_fingerprint, "version": REPLAY_VERSION,
+                              "input_fingerprint": manifest.input_fingerprint, "version": manifest.version,
                               "mapping_config": mapping_dict(config)})
     except (OSError, User_Error):
         raise User_Error("REPLAY_WRITE_FAILED", f"The replay could not be saved in Data_Directory {directory}.",

@@ -2,6 +2,8 @@
 
 Sleep Replay turns one night of sleep and bedroom-environment telemetry into a
 short ambient audio composition (30 seconds to 10 minutes, default 3 minutes).
+Choose ambient music or a continuous nature soundscape of waves, wind, rain,
+leaves, and distant rumble. The night shapes both styles.
 
 After waking, you import a Fitbit export and a SensorPush CSV. The application
 discovers the night's sleep session, aligns both datasets on a common timeline,
@@ -107,6 +109,7 @@ python3 -m venv .venv
 Open **http://127.0.0.1:8734**. Choose **Use sample data**, **Open replay**,
 **Generate replay**, then **Play**. Settings save locally; generating loads at
 00:00 without autoplay. Press Ctrl+C in the terminal to stop both servers.
+For nature audio, choose **Settings → Sound style → Nature** before generating.
 The API listens on 127.0.0.1:8735. Startup reports occupied ports and Python
 versions below 3.11 instead of silently selecting other ports.
 
@@ -153,6 +156,7 @@ controls are documented in [security and storage](docs/security-and-storage.md).
 - [Architecture and new source adapters](docs/architecture.md)
 - [Mapping configuration](docs/mapping-config.md) and [commented example](mapping-config.example.yaml)
 - [CLI reference](docs/cli.md)
+- [Nature sound, continuity, and research licensing](docs/nature-sound.md)
 - [Local data and security](docs/security-and-storage.md)
 - [Troubleshooting every error code and warning](docs/troubleshooting.md)
 
@@ -208,7 +212,8 @@ are specific to the synthetic dataset. Other file types default to the display
 timezone. An explicit offset in an input timestamp takes precedence.
 
 `--config mapping-config.example.yaml` loads a YAML or JSON mapping;
-`--target-duration` and `--seed` override that file. Omitted settings use defaults,
+`--target-duration`, `--seed`, and `--sound-style` override that file. Use
+`--sound-style nature` for wind, waves and environmental layers. Omitted settings use defaults,
 and the CLI ignores previously stored settings and imports. The six metric keys
 map to shared sound parameters with sensitivity, smoothing, and hysteresis.
 The [example configuration](mapping-config.example.yaml) includes all defaults.
@@ -296,3 +301,5 @@ point via the `Data_Source_Adapter` interface.
 ## License
 
 Released under the [MIT License](LICENSE).
+Original nature sound material and generated nature audio use
+[CC0 1.0 Universal](LICENSE-SOUNDS), allowing unrestricted research reuse.

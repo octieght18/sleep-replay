@@ -132,6 +132,7 @@ def test_settings_invalid_last_valid_restore_scope_restart(page):
     page.locator("#target-duration").select_option("30")
     page.locator("#random-seed").fill("123")
     page.locator("#display-units").select_option("metric")
+    page.locator("#sound-style").select_option("nature")
     page.locator("#sensitivity-temperature").fill("0.7")
     page.wait_for_function(
         "() => document.getElementById('settings-status').textContent==='Saved locally.'"
@@ -149,6 +150,7 @@ def test_settings_invalid_last_valid_restore_scope_restart(page):
         saved["target_duration"] == 30
         and saved["random_seed"] == 123
         and saved["display_units"] == "metric"
+        and saved["sound_style"] == "nature"
     )
     assert saved["sensitivities"]["temperature"] == 0.3
     page.reload()
@@ -156,6 +158,7 @@ def test_settings_invalid_last_valid_restore_scope_restart(page):
     page.locator('[data-view="settings"]').click()
     assert page.locator("#random-seed").input_value() == "123"
     assert page.locator("#display-units").input_value() == "metric"
+    assert page.locator("#sound-style").input_value() == "nature"
 
 
 def test_manifest_playback_keyboard_markers_end_and_units(page):
@@ -198,6 +201,30 @@ def test_manifest_playback_keyboard_markers_end_and_units(page):
     page.wait_for_function(
         "() => document.getElementById('environment-values').textContent.includes('°C')"
     )
+
+
+def test_nature_playback_license_style_switch_and_loaded_replay(page):
+    sample(page)
+    page.locator('[data-view="settings"]').click()
+    page.locator("#target-duration").select_option("30")
+    page.locator("#sound-style").select_option("nature")
+    page.locator('[data-view="main"]').click()
+    page.locator("#generate-button").click()
+    page.wait_for_function("() => document.getElementById('replay-audio').readyState>=2")
+    assert page.locator("#replay-style").inner_text() == "Nature · CC0 audio"
+    nature_source = page.locator("#replay-audio").get_attribute("src")
+    page.locator("#play-button").click()
+    page.wait_for_timeout(200)
+    assert not page.evaluate("document.getElementById('replay-audio').paused")
+    page.locator("#play-button").click()
+    page.locator('[data-view="settings"]').click()
+    page.locator("#sound-style").select_option("music")
+    page.locator('[data-view="main"]').click()
+    assert page.locator("#replay-style").inner_text() == "Nature · CC0 audio"
+    assert page.locator("#replay-audio").get_attribute("src") == nature_source
+    page.locator("#generate-button").click()
+    page.wait_for_function("() => document.getElementById('replay-style').textContent==='Ambient music'")
+    assert page.locator("#replay-audio").get_attribute("src") != nature_source
 
 
 def test_generation_failure_preserves_replay_and_progress(page):

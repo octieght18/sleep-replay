@@ -5,15 +5,15 @@ import json
 from pathlib import Path
 
 from backend.domain.mapping import mapping_dict
-from backend.sonification.generation import REPLAY_VERSION
+from backend.domain.audio_provenance import replay_version
 from backend.sonification.manifest import parse_manifest
 
 
-def cache_key(fingerprint, config, version=REPLAY_VERSION):
+def cache_key(fingerprint, config, version=None):
     value = dict(
         input_fingerprint=fingerprint,
         mapping_config=mapping_dict(config),
-        version=version,
+        version=replay_version(config) if version is None else version,
     )
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
@@ -42,7 +42,7 @@ class ReplayCache:
             data = record.metadata
             if (
                 data.get("input_fingerprint") != fingerprint
-                or data.get("version") != REPLAY_VERSION
+                or data.get("version") != replay_version(config)
                 or data.get("mapping_config") != mapping_dict(config)
             ):
                 continue

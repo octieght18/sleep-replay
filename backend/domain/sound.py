@@ -98,6 +98,11 @@ class Render_Plan:
     preset_plan: tuple[Preset_Span, ...]
     seed: int
     notes: tuple[Note_Event, ...] = ()
+    sound_style: str = "music"
+    nature_controls: Mapping[str, Parameter_Trajectory] = field(default_factory=dict)
 
     def __post_init__(self):
         object.__setattr__(self, "trajectories", MappingProxyType(dict(self.trajectories)))
+        if self.sound_style not in ("music", "nature"):
+            raise ValueError("sound style must be music or nature")
+        object.__setattr__(self, "nature_controls", MappingProxyType(dict(self.nature_controls)))

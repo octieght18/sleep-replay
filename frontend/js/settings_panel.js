@@ -35,6 +35,8 @@ export const DEFAULT_SENSITIVITIES = {
 };
 export function validateSetting(kind, value) {
   if (value === "") return "Enter a value.";
+  if (kind === "sound_style" && !["music", "nature"].includes(value))
+    return "Choose ambient music or nature.";
   const number = Number(value);
   if (
     kind === "random_seed" &&
@@ -112,18 +114,24 @@ export class SettingsPanel {
       );
     }
     for (const [id, key, errorId] of [
+      ["sound-style", "sound_style", "style-error"],
       ["target-duration", "target_duration", "duration-error"],
       ["random-seed", "random_seed", "seed-error"],
       ["display-units", "display_units", "units-error"],
     ]) {
       const input = document.getElementById(id);
-      input.setAttribute("aria-describedby", errorId);
+      input.setAttribute(
+        "aria-describedby",
+        id === "sound-style" ? "style-help " + errorId : errorId,
+      );
       input.addEventListener(id === "random-seed" ? "input" : "change", () =>
         this.change(key, null, input, document.getElementById(errorId)),
       );
     }
   }
   display(settings) {
+    document.getElementById("sound-style").value =
+      settings.sound_style || "music";
     document.getElementById("target-duration").value = settings.target_duration;
     document.getElementById("random-seed").value = settings.random_seed;
     document.getElementById("display-units").value = settings.display_units;
@@ -154,7 +162,9 @@ export class SettingsPanel {
     else if (kind === "sensitivity")
       next.sensitivities[key] = Number(input.value);
     else
-      next[kind] = kind === "display_units" ? input.value : Number(input.value);
+      next[kind] = ["display_units", "sound_style"].includes(kind)
+        ? input.value
+        : Number(input.value);
     this.save(next);
   }
   save(next) {

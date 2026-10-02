@@ -100,6 +100,21 @@ def test_config_file_precedence_when_cli_omits_values(tmp_path, capsys):
     assert replay.target_duration_s == 30 and replay.random_seed == 15
 
 
+def test_nature_style_config_and_cli_override(tmp_path):
+    config = tmp_path / "nature.yaml"
+    config.write_text(print_config(replace(DEFAULT_MAPPING, sound_style="nature", target_duration=30)))
+    output = tmp_path / "nature.wav"
+    assert main([*arguments(output), "--config", str(config)]) == 0
+    nature = parse_manifest(output.with_suffix(".json").read_bytes())
+    assert nature.mapping_config.sound_style == "nature" and nature.version == "0.3.0"
+    assert json.loads(output.with_suffix(".json").read_bytes())["sound_provenance"]["license"] == "CC0-1.0"
+    music_output = tmp_path / "music.wav"
+    assert main([*arguments(music_output), "--config", str(config), "--sound-style", "music"]) == 0
+    music = parse_manifest(music_output.with_suffix(".json").read_bytes())
+    assert music.mapping_config.sound_style == "music" and music.version == "0.2.0"
+    assert output.read_bytes() != music_output.read_bytes()
+
+
 def test_no_candidate_date_lists_dates(tmp_path, capsys):
     output = tmp_path / "replay.wav"
     assert main([*arguments(output), "--session-date", "2024-03-03"]) != 0

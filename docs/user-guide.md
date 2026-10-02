@@ -2,7 +2,7 @@
 
 1. Start the app using the [README](../README.md), then open http://127.0.0.1:8734.
 2. On first start choose **Use sample data**. Read the import report and choose **Open replay**.
-3. Choose a session if more than one appears. Open **Settings** to choose a duration, sound mappings, seed, or display units. Changes save locally without generating audio.
+3. Choose a session if more than one appears. Open **Settings** to choose **Ambient music** or **Nature**, a duration, sound mappings, seed, or display units. Changes save locally without generating audio.
 4. Return to **Replay**, choose **Generate replay**, then **Play**. Generation loads at 00:00 and does not autoplay.
 5. Click the timeline or an event marker to seek. Focus the timeline and use Left/Right for five seconds, Home for the beginning, and End for the end. Markers show their labels on hover or keyboard focus.
 
@@ -30,6 +30,8 @@ The browser limit is **2 GiB per file**. For a larger Takeout archive extract ju
 
 Set `SLEEP_REPLAY_DISPLAY_TIMEZONE` before starting the app to choose the zone used for session dates and labels. Local startup otherwise uses the host zone; Docker defaults to UTC. Source overrides affect interpretation of offset-free input timestamps; explicit offsets take precedence. The sample action applies its own `America/New_York` overrides even on a host in another zone.
 
-Sensitivity ranges from 0 to 1 in steps of 0.05. A target of `none` disables that metric's contribution. **Restore mapping defaults** resets targets and sensitivities only; duration, seed and display units stay as chosen. Units change labels immediately without generating another replay. Settings and imported sessions survive restart. Play at the end restarts from the beginning.
+Sensitivity ranges from 0 to 1 in steps of 0.05. A target of `none` disables that metric's contribution. **Restore mapping defaults** resets targets and sensitivities only; sound style, duration, seed and display units stay as chosen. Units change labels immediately without generating another replay. Settings and imported sessions survive restart. Play at the end restarts from the beginning.
+
+Nature provides continuous wind and waves. Variation from the night's usual temperature, humidity and pressure adds rustling leaves, soft rain and distant rumble, with gradual transitions through missing data and stage changes. Its original sounds are CC0, permitting research reuse. See [nature sound and licensing](nature-sound.md) for the mappings, continuity, and license scope.
 
 Sleep Replay is not a medical device and provides no health advice, diagnosis or treatment recommendations.

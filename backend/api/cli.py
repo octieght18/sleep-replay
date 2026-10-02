@@ -41,6 +41,7 @@ def parser():
     generate.add_argument("--config", type=Path)
     generate.add_argument("--target-duration", type=int)
     generate.add_argument("--seed", type=_seed_option)
+    generate.add_argument("--sound-style", choices=("music", "nature"), help="Sound character; config/default music otherwise")
     generate.add_argument("--display-timezone", help="IANA zone; otherwise the configured/host zone")
     generate.add_argument("--source-timezone", action="append", default=[], metavar="FILE_TYPE=IANA_ZONE")
     for file_type in FILE_TYPES:
@@ -73,6 +74,8 @@ def _generate(args):
         config = replace(config, random_seed=validate_seed(args.seed))
     if args.target_duration is not None:
         config = replace(config, target_duration=validate_target_duration(args.target_duration))
+    if args.sound_style is not None:
+        config = replace(config, sound_style=args.sound_style)
     if args.session_date and (args.manual_start or args.manual_end):
         raise User_Error("INVALID_MANUAL_RANGE", "A session date cannot be combined with manual times.", "Choose --session-date or both --manual-start and --manual-end.")
     if bool(args.manual_start) != bool(args.manual_end):

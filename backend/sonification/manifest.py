@@ -7,6 +7,7 @@ from dataclasses import fields
 from datetime import datetime, timezone
 
 from backend.domain.errors import User_Error
+from backend.domain.audio_provenance import nature_provenance
 from backend.domain.events import Event_Type
 from backend.domain.mapping import METRIC_KEYS, TARGET_DURATIONS, mapping_dict, mapping_from_dict, validate_seed
 from backend.domain.replay import Metric_Availability, Night_Event_Record, Replay_Manifest
@@ -19,7 +20,7 @@ def manifest_dict(manifest):
     zone = validate_iana(manifest.display_timezone)
     def timestamp(t):
         return t.astimezone(zone).isoformat(timespec="microseconds" if t.microsecond else "seconds")
-    return dict(
+    result = dict(
         session_start=timestamp(manifest.session_start), session_end=timestamp(manifest.session_end),
         display_timezone=manifest.display_timezone, target_duration_s=manifest.target_duration_s,
         compression_ratio=float(manifest.compression_ratio), timeline_resolution_s=manifest.timeline_resolution_s,
@@ -31,6 +32,9 @@ def manifest_dict(manifest):
         unavailable_metrics=list(manifest.unavailable_metrics), mapping_config=mapping_dict(manifest.mapping_config),
         random_seed=manifest.random_seed, input_fingerprint=manifest.input_fingerprint, version=manifest.version,
         warnings=list(manifest.warnings))
+    if manifest.mapping_config.sound_style == "nature":
+        result["sound_provenance"] = nature_provenance()
+    return result
 
 
 def serialize_manifest(manifest) -> bytes:
@@ -55,6 +59,11 @@ def _from_dict(data):
     required = {f.name for f in fields(Replay_Manifest)}
     if not isinstance(data, dict):
         raise ValueError("Invalid manifest document: object required")
+    config_data = data.get("mapping_config")
+    if isinstance(config_data, dict) and config_data.get("sound_style") == "nature":
+        required.add("sound_provenance")
+        if data.get("sound_provenance") != nature_provenance():
+            raise ValueError("Invalid manifest field sound_provenance: original CC0 nature generator required")
     missing, unknown = required - data.keys(), data.keys() - required
     if missing or unknown:
         raise ValueError(f"Invalid manifest fields; missing: {sorted(missing)}, unknown: {sorted(unknown)}")

@@ -166,6 +166,7 @@ def test_real_multipart_import_and_limit(client):
         ("random_seed", -1, "INVALID_RANDOM_SEED"),
         ("random_seed", True, "INVALID_RANDOM_SEED"),
         ("display_units", "other", "INVALID_MAPPING_CONFIG"),
+        ("sound_style", "other", "INVALID_MAPPING_CONFIG"),
         (
             "sensitivities",
             {**DEFAULT_SETTINGS.to_dict()["sensitivities"], "temperature": 0.03},
@@ -195,11 +196,57 @@ def test_settings_time_and_no_generation(client):
         generate.assert_not_called()
 
 
+def test_legacy_saved_settings_default_to_music_after_restart(tmp_path):
+    original = DEFAULT_SETTINGS.to_dict()
+    original.pop("sound_style")
+    with MetadataStore(tmp_path) as store:
+        store.set_setting("application_settings", original)
+    with MetadataStore(tmp_path) as store:
+        restored = SettingsService(store).get()
+        assert restored.sound_style == "music"
+        assert restored.to_dict() == {**original, "sound_style": "music"}
+        assert restored.to_mapping_config().sound_style == "music"
+
+
+def test_style_switch_creates_distinct_replay_and_cache_survives_restart(tmp_path):
+    from backend.audio.renderer import render
+    with TestClient(create_app(tmp_path, display_timezone="America/New_York")) as client:
+        data = sample_settings(client)
+        with patch("backend.sonification.generation.render", wraps=render) as renderer:
+            music = client.post("/api/replays").json()
+            data["sound_style"] = "nature"
+            assert client.put("/api/settings", json=data).status_code == 200
+            nature = client.post("/api/replays").json()
+            assert not nature["cached"] and nature["id"] != music["id"]
+            document = client.get(nature["manifest_url"]).json()
+            assert document["mapping_config"]["sound_style"] == "nature"
+            assert document["sound_provenance"]["license"] == "CC0-1.0"
+            assert document["version"] == "0.3.0"
+            assert renderer.call_count == 2
+            assert client.post("/api/replays").json()["cached"]
+            audio = client.get(nature["audio_url"]).content
+            from sonification_helpers import assert_audio, read_wav
+            assert_audio(*read_wav(audio), 30)
+            data["sound_style"] = "music"
+            client.put("/api/settings", json=data)
+            assert client.post("/api/replays").json()["id"] == music["id"]
+            assert renderer.call_count == 2
+    with TestClient(create_app(tmp_path, display_timezone="America/New_York")) as restarted:
+        data["sound_style"] = "nature"
+        restarted.put("/api/settings", json=data)
+        with patch("backend.sonification.generation.render") as renderer:
+            cached = restarted.post("/api/replays").json()
+            assert cached["cached"] and cached["id"] == nature["id"]
+            assert restarted.get(cached["audio_url"]).content == audio
+            renderer.assert_not_called()
+
+
 setting_values = st.fixed_dictionaries(
     {
         "target_duration": st.sampled_from(TARGET_DURATIONS),
         "random_seed": st.integers(0, 2**32 - 1),
         "display_units": st.sampled_from(("imperial", "metric")),
+        "sound_style": st.sampled_from(("music", "nature")),
         "targets": st.fixed_dictionaries(
             {k: st.sampled_from([t.value for t in Mapping_Target]) for k in METRIC_KEYS}
         ),
@@ -346,6 +393,7 @@ def test_concurrent_generation_is_rejected(client, renderer):
             "duration",
             "smoothing",
             "hysteresis",
+            "style",
         )
     ),
 )
@@ -392,6 +440,8 @@ def test_cache_equivalence(seed, change):
             fingerprint = "b" * 64
         elif change == "version":
             record.metadata["version"] = "future"
+        elif change == "style":
+            config = replace(config, sound_style="nature")
         else:
             metrics = dict(config.metrics)
             values = {

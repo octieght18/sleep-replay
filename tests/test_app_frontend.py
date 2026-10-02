@@ -125,6 +125,9 @@ def test_marker_math_and_clock(js):
         ("sensitivity", "1", False),
         ("sensitivity", "2", True),
         ("sensitivity", "NaN", True),
+        ("sound_style", "nature", False),
+        ("sound_style", "music", False),
+        ("sound_style", "other", True),
     ],
 )
 def test_setting_validation(js, kind, value, invalid):

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sleep-replay"
-version = "0.2.0"
+version = "0.3.0"
 description = "Sleep Replay: turns a night of sleep and bedroom telemetry into a compressed audio replay."
 requires-python = ">=3.11"
 dependencies = [

@@ -112,6 +112,7 @@
           </form>
         </div>
         <div class="replay-card">
+          <p id="replay-style" hidden></p>
           <div class="replay-readout">
             <div>
               <span id="state-label"></span><span id="night-time"></span>
@@ -172,6 +173,22 @@
           </button>
         </div>
         <form id="settings-form">
+          <label
+            >Sound style<select
+              id="sound-style"
+              aria-describedby="style-help style-error"
+            >
+              <option value="music">Ambient music</option>
+              <option value="nature">
+                Nature · waves, wind &amp; rain
+              </option></select
+            ><small class="field-error" id="style-error"></small
+          ></label>
+          <p id="style-help">
+            Nature blends continuous waves and wind with rain, leaves, and
+            distant rumble as the night varies. Both styles follow your
+            mappings.
+          </p>
           <div class="settings-top">
             <label
               >Replay duration<select id="target-duration">

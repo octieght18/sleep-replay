@@ -15,6 +15,12 @@ All six metrics can target any of `pulse_rate`, `rhythmic_density`, `intensity`,
 
 ## Direction, neutral and combination
 
+`sound_style` accepts `music` (default) or `nature`. Nature uses the same mappings
+to shape waves, wind, rain and leaves, with additional slow responses to the
+night's environmental variation. See [nature sound and licensing](nature-sound.md)
+for its layer mappings and variation formula. The musical voices and preset
+table below describe music mode.
+
 Every metric's contribution is nondecreasing with its normalized value before hysteresis and rate limits. For normalized value n and sensitivity s it is `clamp(0.5 + s × (n − 0.5), 0, 1)`; pressure uses half that excursion. Normalization is relative to the night's smoothed range, widened to minimum spans of 10 bpm, 10 ms, 2 °C, 10 percentage points and 3 hPa. Movement already lies in 0–1. Session HRV provides a constant `rmssd/100` contribution when intraday HRV is absent.
 
 Neutral is **0.5** for every parameter. `none`, zero sensitivity and wholly unavailable data contribute neutral. Missing windows glide toward neutral over one replay second and glide back on recovery. Hysteresis holds the last accepted contribution until raw smoothed change reaches its threshold. Multiple metrics assigned to one parameter combine as their sensitivity-weighted arithmetic mean; no contributors means neutral. Restless windows add `0.25 × movement sensitivity` to texture/transient density when movement is enabled, clamped to one. This shared boost remains independent of the movement target. Final trajectories change at most 0.5/second for the four fast parameters and 0.2/second for the three slow parameters.
